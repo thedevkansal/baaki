@@ -46,7 +46,5 @@ export function Amount({
             balanceTone(value)
           ]
 
-  return (
-    <span className={cn(SIZES[size], toneClass, className)}>{text}</span>
-  )
+  return <span className={cn(SIZES[size], toneClass, className)}>{text}</span>
 }

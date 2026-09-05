@@ -31,7 +31,14 @@ describe('VPA validation', () => {
   })
 
   it('rejects things that would send money to a stranger', () => {
-    for (const vpa of ['priya', 'priya@', '@okhdfcbank', 'priya@@ybl', 'priya @ybl', '.a@ybl']) {
+    for (const vpa of [
+      'priya',
+      'priya@',
+      '@okhdfcbank',
+      'priya@@ybl',
+      'priya @ybl',
+      '.a@ybl',
+    ]) {
       expect(isValidVpa(vpa)).toBe(false)
     }
   })
@@ -51,14 +58,16 @@ describe('building the link', () => {
   it('uses the generic intent by default and app schemes on request', () => {
     expect(buildUpiLink(BASE).startsWith('upi://pay?')).toBe(true)
     expect(buildUpiLink({ ...BASE, app: 'gpay' }).startsWith('gpay://upi/pay?')).toBe(true)
-    expect(buildUpiLink({ ...BASE, app: 'phonepe' }).startsWith('phonepe://pay?')).toBe(true)
+    expect(buildUpiLink({ ...BASE, app: 'phonepe' }).startsWith('phonepe://pay?')).toBe(
+      true,
+    )
     expect(buildUpiLink({ ...BASE, app: 'paytm' }).startsWith('paytmmp://pay?')).toBe(true)
   })
 
   it('sends the exact amount, paise and all', () => {
-    expect(params(buildUpiLink({ ...BASE, amount: fromMajor('0.05', 'INR') })).get('am')).toBe(
-      '0.05',
-    )
+    expect(
+      params(buildUpiLink({ ...BASE, amount: fromMajor('0.05', 'INR') })).get('am'),
+    ).toBe('0.05')
     expect(
       params(buildUpiLink({ ...BASE, amount: fromMajor('123456.78', 'INR') })).get('am'),
     ).toBe('123456.78')
@@ -72,7 +81,9 @@ describe('building the link', () => {
   it('refuses anything that would send the wrong money', () => {
     expect(() => buildUpiLink({ ...BASE, vpa: 'not-a-vpa' })).toThrow(/not a valid UPI ID/)
     expect(() => buildUpiLink({ ...BASE, amount: fromMajor('10', 'USD') })).toThrow(/INR/)
-    expect(() => buildUpiLink({ ...BASE, amount: money(0n, 'INR') })).toThrow(/greater than zero/)
+    expect(() => buildUpiLink({ ...BASE, amount: money(0n, 'INR') })).toThrow(
+      /greater than zero/,
+    )
     expect(() => buildUpiLink({ ...BASE, amount: fromMajor('-5', 'INR') })).toThrow(
       /greater than zero/,
     )
@@ -82,7 +93,9 @@ describe('building the link', () => {
 describe('device routing', () => {
   it('reads the platform off the user agent', () => {
     expect(detectPlatform('Mozilla/5.0 (Linux; Android 14; Pixel 8)')).toBe('android')
-    expect(detectPlatform('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)')).toBe('ios')
+    expect(detectPlatform('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)')).toBe(
+      'ios',
+    )
     expect(detectPlatform('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')).toBe('other')
   })
 

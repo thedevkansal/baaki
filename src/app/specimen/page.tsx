@@ -1,5 +1,6 @@
 import { Amount } from '@/components/ui/amount'
 import { fromMajor, money } from '@/lib/money'
+import { BeamDemo } from './beam-demo'
 
 export const metadata = { title: 'Specimen' }
 
@@ -43,8 +44,8 @@ export default function SpecimenPage() {
           Design specimen
         </h1>
         <p className="mt-4 max-w-prose text-muted">
-          Six colours, three typefaces, one signed axis. If something here is not an
-          amount, it is ink on paper.
+          Six colours, three typefaces, one signed axis. If something here is not an amount,
+          it is ink on paper.
         </p>
       </header>
 
@@ -65,13 +66,17 @@ export default function SpecimenPage() {
             Settle up in one tap
           </p>
           <p className="max-w-prose">
-            Body copy is Schibsted Grotesk. It carries every list row, every label,
-            and every sentence that explains what a number means.
+            Body copy is Schibsted Grotesk. It carries every list row, every label, and
+            every sentence that explains what a number means.
           </p>
           <p className="font-mono text-sm text-muted">
             IBM Plex Mono · 04 Sep 2026 · txn 8f2a41 · split 4 ways
           </p>
         </div>
+      </Section>
+
+      <Section label="Balance beam">
+        <BeamDemo />
       </Section>
 
       <Section label="Amounts">
@@ -96,8 +101,8 @@ export default function SpecimenPage() {
           </div>
           <p className="text-sm text-muted">
             Lakh grouping and exact paise:{' '}
-            <Amount value={fromMajor('1234567.05', 'INR')} tone="ink" /> · other
-            currencies keep their own minor units:{' '}
+            <Amount value={fromMajor('1234567.05', 'INR')} tone="ink" /> · other currencies
+            keep their own minor units:{' '}
             <Amount value={fromMajor('1200', 'JPY')} tone="ink" />
           </p>
         </div>

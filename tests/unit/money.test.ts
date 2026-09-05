@@ -75,10 +75,22 @@ describe('golden splits', () => {
 
   it('rotates the odd paisa on the next expense', () => {
     expect(minorOf(splitEqually(fromMajor('0.01', INR), 7, 1))).toEqual([
-      0n, 1n, 0n, 0n, 0n, 0n, 0n,
+      0n,
+      1n,
+      0n,
+      0n,
+      0n,
+      0n,
+      0n,
     ])
     expect(minorOf(splitEqually(fromMajor('0.01', INR), 7, 2))).toEqual([
-      0n, 0n, 1n, 0n, 0n, 0n, 0n,
+      0n,
+      0n,
+      1n,
+      0n,
+      0n,
+      0n,
+      0n,
     ])
   })
 

@@ -146,9 +146,7 @@ describe('simplify', () => {
     const why = provenance[index]
     expect(why.exact).toBe(true)
     expect(why.offsets).toHaveLength(0)
-    expect(
-      why.replaces.map((d) => [d.to, d.amount.minor]).sort(),
-    ).toEqual([
+    expect(why.replaces.map((d) => [d.to, d.amount.minor]).sort()).toEqual([
       [M, 13000n],
       [P, 21000n],
     ])

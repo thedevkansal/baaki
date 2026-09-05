@@ -44,7 +44,9 @@ export function zero(currency: CurrencyCode): Money {
  * units. Never goes through Number, so no precision is lost at any magnitude.
  */
 export function fromMajor(input: string | number, currency: CurrencyCode): Money {
-  const raw = String(input).trim().replace(/[\s,_]/g, '')
+  const raw = String(input)
+    .trim()
+    .replace(/[\s,_]/g, '')
   const match = /^(-)?(\d*)(?:\.(\d*))?$/.exec(raw)
   if (!match || (match[2] === '' && (match[3] ?? '') === '')) {
     throw new Error(`fromMajor: cannot parse ${JSON.stringify(String(input))} as an amount`)
@@ -118,11 +120,7 @@ export function sum(amounts: readonly Money[], currency: CurrencyCode): Money {
  *
  * Weights of zero never receive a leftover unit.
  */
-export function allocate(
-  total: Money,
-  weights: readonly bigint[],
-  seed = 0,
-): Money[] {
+export function allocate(total: Money, weights: readonly bigint[], seed = 0): Money[] {
   const n = weights.length
   if (n === 0) throw new Error('allocate: no weights given')
   if (weights.some((w) => w < 0n)) throw new Error('allocate: negative weight')
@@ -159,5 +157,9 @@ export function splitEqually(total: Money, count: number, seed = 0): Money[] {
   if (!Number.isInteger(count) || count <= 0) {
     throw new Error('splitEqually: count must be a positive integer')
   }
-  return allocate(total, Array.from({ length: count }, () => 1n), seed)
+  return allocate(
+    total,
+    Array.from({ length: count }, () => 1n),
+    seed,
+  )
 }

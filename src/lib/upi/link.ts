@@ -82,7 +82,8 @@ export function buildUpiLink({
   params.set('am', toMajorString(amount))
   params.set('cu', 'INR')
   if (note) params.set('tn', sanitiseNote(note))
-  if (reference) params.set('tr', reference.replace(/[^A-Za-z0-9]/g, '').slice(0, REFERENCE_LIMIT))
+  if (reference)
+    params.set('tr', reference.replace(/[^A-Za-z0-9]/g, '').slice(0, REFERENCE_LIMIT))
 
   return `${SCHEMES[app]}?${params.toString()}`
 }
@@ -126,7 +127,9 @@ export function settleRoute(input: UpiLinkInput, platform: UpiPlatform): SettleR
   if (platform === 'android') {
     return {
       kind: 'intent',
-      links: [{ app: 'any', label: 'Pay with UPI', href: buildUpiLink({ ...input, app: 'any' }) }],
+      links: [
+        { app: 'any', label: 'Pay with UPI', href: buildUpiLink({ ...input, app: 'any' }) },
+      ],
       copyVpa,
     }
   }
@@ -146,7 +149,9 @@ export function settleRoute(input: UpiLinkInput, platform: UpiPlatform): SettleR
 
   return {
     kind: 'qr',
-    links: [{ app: 'any', label: 'Scan to pay', href: buildUpiLink({ ...input, app: 'any' }) }],
+    links: [
+      { app: 'any', label: 'Scan to pay', href: buildUpiLink({ ...input, app: 'any' }) },
+    ],
     copyVpa,
   }
 }
