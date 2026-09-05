@@ -26,7 +26,14 @@ export function formatMoney(m: Money, options: FormatMoneyOptions = {}): string 
   })
 
   const magnitude = m.minor < 0n ? -m.minor : m.minor
-  const text = formatter.format(toMajorString({ minor: magnitude, currency: m.currency }))
+  // Intl accepts an arbitrary-precision decimal string, but its type only
+  // admits string *literals*. toMajorString always produces a valid numeric
+  // literal, so this cast is what lets the exact value reach the formatter.
+  const exact = toMajorString({
+    minor: magnitude,
+    currency: m.currency,
+  }) as Intl.StringNumericLiteral
+  const text = formatter.format(exact)
 
   if (m.minor < 0n) return `-${text}`
   if (signed && m.minor > 0n) return `+${text}`
