@@ -1,0 +1,72 @@
+/**
+ * Baaki design tokens.
+ *
+ * The whole system comes from one idea: a balance is a signed number. So the
+ * palette is an axis with two poles - teal when you are owed, plum when you
+ * owe - and everything that is not a signed amount is ink on paper.
+ *
+ * Six colour tokens. There is deliberately no seventh, and no accent colour.
+ * If you reach for one, the answer is ink.
+ */
+
+:root {
+  /* --- the six --- */
+  --paper: #f7f6f3;
+  --ink: #16181d;
+  --muted: #6e7178;
+  --rule: #dfdcd4;
+  --pos: #0b6e63; /* owed to you */
+  --neg: #8b3a62; /* you owe */
+
+  /* --- surfaces derived from the six, never new hues --- */
+  --paper-raised: #fffefb;
+  --paper-sunken: #efede7;
+  --pos-wash: color-mix(in oklab, var(--pos) 8%, transparent);
+  --neg-wash: color-mix(in oklab, var(--neg) 8%, transparent);
+  --focus: var(--ink);
+
+  /* --- type --- */
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- motion --- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-quick: 140ms;
+  --dur-settle: 900ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121316;
+    --ink: #ededea;
+    --muted: #93969c;
+    --rule: #2a2c31;
+    --pos: #3fa898;
+    --neg: #c77399;
+
+    --paper-raised: #191b1f;
+    --paper-sunken: #0d0e11;
+    --focus: var(--ink);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #121316;
+  --ink: #ededea;
+  --muted: #93969c;
+  --rule: #2a2c31;
+  --pos: #3fa898;
+  --neg: #c77399;
+
+  --paper-raised: #191b1f;
+  --paper-sunken: #0d0e11;
+  --focus: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-quick: 0ms;
+    --dur-settle: 0ms;
+  }
+}
