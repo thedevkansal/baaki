@@ -39,6 +39,12 @@ export interface Expense {
   payers: Allocation[]
   shares: Allocation[]
   /**
+   * What was typed into the split fields, keyed by person: percentages,
+   * shares, exact amounts. Kept so reopening a bill shows the split the way it
+   * was entered rather than reverse engineering it from the amounts.
+   */
+  splitValues?: Record<string, string>
+  /**
    * What was actually spent, before conversion. Kept alongside the converted
    * amounts so an old expense still shows the number that was on the bill.
    */

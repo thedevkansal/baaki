@@ -9,8 +9,8 @@ import { formatMoney } from '@/lib/format'
 import { FALLBACK_RATES_TO_INR, SUPPORTED_CURRENCIES, convertMoney } from '@/lib/fx'
 import { fromMajor, money, sum, toMajorString, zero, type Money } from '@/lib/money'
 import { SPLIT_MODES, buildShares, evaluateAmount, type SplitMode } from '@/lib/split'
-import { addExpense } from '@/lib/store/store'
-import { CATEGORIES, type Person } from '@/lib/store/types'
+import { addExpense, updateExpense } from '@/lib/store/store'
+import { CATEGORIES, type Expense, type Person } from '@/lib/store/types'
 
 export function AddExpenseSheet({
   open,
@@ -20,6 +20,7 @@ export function AddExpenseSheet({
   members,
   defaultPayerId,
   splitSeed,
+  existing,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -32,26 +33,65 @@ export function AddExpenseSheet({
    * used, so the preview stays put while you type instead of reshuffling.
    */
   splitSeed: number
+  /** Present when reopening a bill to change it rather than adding one. */
+  existing?: Expense
 }) {
-  // The sheet is mounted only while it is open, so every field starts fresh
-  // and there is no effect copying props into state.
-  const [description, setDescription] = useState('')
-  const [amountText, setAmountText] = useState('')
-  const [category, setCategory] = useState<string>('General')
-  const [occurredOn, setOccurredOn] = useState(() => new Date().toISOString().slice(0, 10))
+  // The sheet is mounted only while it is open, so every field starts from the
+  // bill being edited, or empty, with no effect copying props into state.
+  const editedTotal = existing
+    ? money(
+        existing.shares.reduce((acc, s) => acc + BigInt(s.minor), 0n),
+        currency,
+      )
+    : null
 
-  const [spentCurrency, setSpentCurrency] = useState(currency)
-  const [rate, setRate] = useState('1')
-
-  const [multiPayer, setMultiPayer] = useState(false)
-  const [payerId, setPayerId] = useState(defaultPayerId)
-  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>({})
-
-  const [mode, setMode] = useState<SplitMode>('equal')
-  const [included, setIncluded] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(members.map((m) => [m.id, true])),
+  const [description, setDescription] = useState(existing?.description ?? '')
+  const [amountText, setAmountText] = useState(() => {
+    if (!existing) return ''
+    if (existing.original) {
+      return toMajorString(
+        money(BigInt(existing.original.minor), existing.original.currency),
+      )
+    }
+    return toMajorString(editedTotal!)
+  })
+  const [category, setCategory] = useState<string>(existing?.category ?? 'General')
+  const [occurredOn, setOccurredOn] = useState(
+    existing?.occurredOn ?? new Date().toISOString().slice(0, 10),
   )
-  const [splitValues, setSplitValues] = useState<Record<string, string>>({})
+
+  const [spentCurrency, setSpentCurrency] = useState(
+    existing?.original?.currency ?? currency,
+  )
+  const [rate, setRate] = useState(existing?.original?.rateToGroupCurrency ?? '1')
+
+  const [multiPayer, setMultiPayer] = useState((existing?.payers.length ?? 0) > 1)
+  const [payerId, setPayerId] = useState(existing?.payers[0]?.personId ?? defaultPayerId)
+  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>(() =>
+    existing
+      ? Object.fromEntries(
+          existing.payers.map((p) => [
+            p.personId,
+            toMajorString(money(BigInt(p.minor), currency)),
+          ]),
+        )
+      : {},
+  )
+
+  const [mode, setMode] = useState<SplitMode>(existing?.splitMode ?? 'equal')
+  const [included, setIncluded] = useState<Record<string, boolean>>(() =>
+    existing
+      ? Object.fromEntries(
+          members.map((m) => [
+            m.id,
+            existing.shares.some((s) => s.personId === m.id && BigInt(s.minor) !== 0n),
+          ]),
+        )
+      : Object.fromEntries(members.map((m) => [m.id, true])),
+  )
+  const [splitValues, setSplitValues] = useState<Record<string, string>>(
+    () => existing?.splitValues ?? {},
+  )
 
   const spent = evaluateAmount(amountText, spentCurrency)
   const isForeign = spentCurrency !== currency
@@ -106,7 +146,7 @@ export function AddExpenseSheet({
 
   const save = () => {
     if (!total || !split || split.error || payerError) return
-    addExpense({
+    const draft = {
       groupId,
       description,
       category,
@@ -114,11 +154,15 @@ export function AddExpenseSheet({
       splitMode: mode,
       payers,
       shares: split.shares.map((s) => ({ personId: s.ref, minor: s.amount.minor })),
+      splitValues: mode === 'equal' ? undefined : splitValues,
       original:
         isForeign && spent
           ? { currency: spentCurrency, minor: spent.minor, rateToGroupCurrency: rate }
           : undefined,
-    })
+    }
+
+    if (existing) updateExpense(existing.id, draft)
+    else addExpense(draft)
     onOpenChange(false)
   }
 
@@ -137,10 +181,16 @@ export function AddExpenseSheet({
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Add an expense"
+      title={existing ? 'Edit this bill' : 'Add an expense'}
       footer={
         <Button variant="primary" className="w-full" onClick={save} disabled={!canSave}>
-          {total ? `Add ${formatMoney(total)}` : 'Add expense'}
+          {existing
+            ? total
+              ? `Save ${formatMoney(total)}`
+              : 'Save changes'
+            : total
+              ? `Add ${formatMoney(total)}`
+              : 'Add expense'}
         </Button>
       }
     >

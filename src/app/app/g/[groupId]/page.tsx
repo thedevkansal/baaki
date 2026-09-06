@@ -38,6 +38,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [focused, setFocused] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
 
   const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
 
@@ -312,31 +313,40 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                 return (
                   <li
                     key={expense.id}
-                    className="rise group flex items-center gap-4 rounded-xl border border-rule px-4 py-3 transition-colors hover:border-ink"
+                    className="rise group flex items-center gap-2 rounded-xl border border-rule pr-2 transition-colors hover:border-ink"
                     style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{expense.description}</p>
-                      <p className="mt-0.5 truncate text-xs text-muted">
-                        {paidBy || 'nobody'} paid · {expense.category} ·{' '}
-                        {expense.occurredOn}
-                        {expense.original &&
-                          ` · ${formatMoney(
-                            money(
-                              BigInt(expense.original.minor),
-                              expense.original.currency,
-                            ),
-                          )}`}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="font-mono text-sm tabular-nums">
-                        {formatMoney(money(total, currency))}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-                        you {formatMoney(money(BigInt(yourShare), currency))}
-                      </p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(expense.id)}
+                      aria-label={`Edit ${expense.description}`}
+                      className="flex min-w-0 flex-1 items-center gap-4 rounded-xl px-4 py-3 text-left"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {expense.description}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted">
+                          {paidBy || 'nobody'} paid · {expense.category} ·{' '}
+                          {expense.occurredOn}
+                          {expense.original &&
+                            ` · ${formatMoney(
+                              money(
+                                BigInt(expense.original.minor),
+                                expense.original.currency,
+                              ),
+                            )}`}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="font-mono text-sm tabular-nums">
+                          {formatMoney(money(total, currency))}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+                          you {formatMoney(money(BigInt(yourShare), currency))}
+                        </p>
+                      </div>
+                    </button>
                     <button
                       type="button"
                       onClick={() => deleteExpense(expense.id)}
@@ -384,6 +394,24 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           nameOf={ledger.nameOf}
         />
       )}
+
+      {editing &&
+        (() => {
+          const expense = expenses.find((e) => e.id === editing)
+          if (!expense) return null
+          return (
+            <AddExpenseSheet
+              open
+              onOpenChange={(next) => !next && setEditing(null)}
+              groupId={groupId}
+              currency={currency}
+              members={members}
+              defaultPayerId={me?.id ?? members[0]?.id ?? ''}
+              splitSeed={expenses.length}
+              existing={expense}
+            />
+          )
+        })()}
 
       {adding && (
         <AddExpenseSheet

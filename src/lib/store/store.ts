@@ -167,6 +167,7 @@ export interface ExpenseDraft {
   splitMode: SplitMode
   payers: { personId: string; minor: bigint }[]
   shares: { personId: string; minor: bigint }[]
+  splitValues?: Record<string, string>
   original?: { currency: string; minor: bigint; rateToGroupCurrency: string }
 }
 
@@ -181,6 +182,7 @@ export function addExpense(draft: ExpenseDraft): Expense {
     splitMode: draft.splitMode,
     payers: draft.payers.map((p) => ({ personId: p.personId, minor: p.minor.toString() })),
     shares: draft.shares.map((s) => ({ personId: s.personId, minor: s.minor.toString() })),
+    splitValues: draft.splitValues,
     original: draft.original && {
       currency: draft.original.currency,
       minor: draft.original.minor.toString(),
@@ -190,6 +192,39 @@ export function addExpense(draft: ExpenseDraft): Expense {
   }
   commit({ ...current, expenses: [expense, ...current.expenses] })
   return expense
+}
+
+/** Replaces a bill in place, keeping its id and its position in the list. */
+export function updateExpense(expenseId: string, draft: ExpenseDraft) {
+  const current = load()
+  commit({
+    ...current,
+    expenses: current.expenses.map((expense) =>
+      expense.id === expenseId
+        ? {
+            ...expense,
+            description: draft.description.trim() || 'Expense',
+            category: draft.category,
+            occurredOn: draft.occurredOn,
+            splitMode: draft.splitMode,
+            payers: draft.payers.map((p) => ({
+              personId: p.personId,
+              minor: p.minor.toString(),
+            })),
+            shares: draft.shares.map((s) => ({
+              personId: s.personId,
+              minor: s.minor.toString(),
+            })),
+            splitValues: draft.splitValues,
+            original: draft.original && {
+              currency: draft.original.currency,
+              minor: draft.original.minor.toString(),
+              rateToGroupCurrency: draft.original.rateToGroupCurrency,
+            },
+          }
+        : expense,
+    ),
+  })
 }
 
 export function deleteExpense(expenseId: string) {
