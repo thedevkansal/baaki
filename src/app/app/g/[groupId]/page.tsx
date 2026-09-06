@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { AddExpenseSheet } from '@/components/app/add-expense-sheet'
 import { GroupCharts } from '@/components/app/group-charts'
 import { SettleSheet } from '@/components/app/settle-sheet'
-import { AnimatedAmount } from '@/components/ui/animated-amount'
+import { BalanceBeam } from '@/components/beam/balance-beam'
 import { Button } from '@/components/ui/button'
 import { Avatar, Field, SegmentedControl, inputClass } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
@@ -34,6 +34,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [newName, setNewName] = useState('')
   const [settling, setSettling] = useState<{ to: Person; amount: Money } | null>(null)
   const [why, setWhy] = useState<number | null>(null)
+  const [focused, setFocused] = useState<string | null>(null)
 
   const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
 
@@ -53,6 +54,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
 
   const currency = group.currency
   const pending = settlements.filter((s) => s.status === 'proposed')
+  const focusedPerson = yourSplit.find((s) => s.person.id === focused)
   const myTransfers = ledger.transfers
     .map((t, index) => ({ t, index }))
     .filter(({ t }) => personIdOf(t.from) === state.meId)
@@ -76,40 +78,41 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         </Button>
       </div>
 
-      <div className="mt-8 flex flex-col items-center rounded-2xl border border-rule bg-paper-raised px-6 py-9">
-        <AnimatedAmount value={yourNet} />
-        <p className="mt-2 text-sm text-muted">
-          {yourNet.minor < 0n
-            ? 'is what you owe in this group'
-            : yourNet.minor > 0n
-              ? 'is what this group owes you'
-              : expenses.length === 0
-                ? 'nothing added yet'
-                : 'you are square with everyone'}
-        </p>
+      <div className="mt-8 rounded-2xl border border-rule bg-paper-raised px-6 py-9">
+        <BalanceBeam
+          currency={currency}
+          segments={yourSplit.map(({ person, amount }) => ({
+            id: person.id,
+            label: person.name,
+            amount,
+          }))}
+          selectedId={focused}
+          onSelect={setFocused}
+          caption={
+            expenses.length === 0
+              ? 'nothing added yet'
+              : yourNet.minor < 0n
+                ? 'is what you owe in this group'
+                : yourNet.minor > 0n
+                  ? 'is what this group owes you'
+                  : 'you are square with everyone'
+          }
+        />
 
-        {yourSplit.length > 0 && (
-          <ul className="mt-6 flex w-full flex-col gap-2">
-            {yourSplit.map(({ person, amount }) => (
-              <li
-                key={person.id}
-                className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-2.5"
-              >
-                <Avatar name={person.name} />
-                <span className="min-w-0 flex-1 truncate text-sm">
-                  {amount.minor < 0n ? `You owe ${person.name}` : `${person.name} owes you`}
-                </span>
-                <span
-                  className={cn(
-                    'shrink-0 font-mono text-sm tabular-nums',
-                    amount.minor < 0n ? 'text-neg' : 'text-pos',
-                  )}
-                >
-                  {formatMoney(money(abs(amount.minor), currency))}
-                </span>
-              </li>
-            ))}
-          </ul>
+        {focusedPerson && (
+          <p className="mt-6 rounded-xl bg-paper px-4 py-3 text-sm">
+            {focusedPerson.amount.minor < 0n
+              ? `You owe ${focusedPerson.person.name}`
+              : `${focusedPerson.person.name} owes you`}{' '}
+            <span
+              className={cn(
+                'font-mono tabular-nums',
+                focusedPerson.amount.minor < 0n ? 'text-neg' : 'text-pos',
+              )}
+            >
+              {formatMoney(money(abs(focusedPerson.amount.minor), currency))}
+            </span>
+          </p>
         )}
 
         {myTransfers.length > 0 && (
