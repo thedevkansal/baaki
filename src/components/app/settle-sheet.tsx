@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { Field, inputClass } from '@/components/ui/field'
+import { QrCode } from '@/components/ui/qr-code'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import type { Money } from '@/lib/money'
@@ -115,11 +116,22 @@ export function SettleSheet({
             </p>
 
             {route.kind === 'qr' ? (
-              <div className="mt-3 rounded-2xl border border-rule bg-paper-raised p-5">
-                <p className="text-sm leading-relaxed text-muted">
-                  There is no UPI app on a desktop. Open Baaki on your phone, or pay{' '}
-                  <span className="font-mono text-ink">{route.copyVpa}</span> directly.
-                </p>
+              <div className="mt-3 flex flex-col items-center gap-4 rounded-2xl border border-rule bg-paper-raised p-5 sm:flex-row sm:items-start">
+                <div className="w-40 shrink-0 rounded-xl border border-rule p-2 text-ink">
+                  <QrCode
+                    value={route.links[0].href}
+                    title={`UPI QR to pay ${to.name} ${formatMoney(amount)}`}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm leading-relaxed text-muted">
+                    There is no UPI app on a desktop. Scan this with your phone and the
+                    payee, amount and note arrive already filled in.
+                  </p>
+                  <p className="mt-3 font-mono text-sm break-all text-ink">
+                    {route.copyVpa}
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
