@@ -91,7 +91,23 @@ export function useGroupLedger(groupId: string): GroupLedger {
 
     const net = netBalances(entries, settlementEntries, currency)
     const edges = pairwiseDebts(entries, settlementEntries, currency)
-    const { transfers, provenance } = simplify(net, edges, currency)
+
+    /**
+     * With simplification off, the debts shown are the ones actually incurred:
+     * you pay the people you owe, even if that means more payments. The
+     * setting has to change what is owed, not just how it is described.
+     */
+    const { transfers, provenance } =
+      group?.simplify === false
+        ? {
+            transfers: edges,
+            provenance: edges.map((debt) => ({
+              replaces: [debt],
+              offsets: [],
+              exact: true,
+            })),
+          }
+        : simplify(net, edges, currency)
 
     const balances: MemberBalance[] = members
       .map((person) => ({ person, net: net.get(refOf(person.id)) ?? zero(currency) }))

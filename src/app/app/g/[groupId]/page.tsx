@@ -4,6 +4,7 @@ import { use, useState } from 'react'
 import Link from 'next/link'
 import { AddExpenseSheet } from '@/components/app/add-expense-sheet'
 import { GroupCharts } from '@/components/app/group-charts'
+import { GroupSettingsSheet } from '@/components/app/group-settings-sheet'
 import { SettleSheet } from '@/components/app/settle-sheet'
 import { BalanceBeam } from '@/components/beam/balance-beam'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [why, setWhy] = useState<number | null>(null)
   const [focused, setFocused] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
 
@@ -87,9 +89,35 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           >
             ← all groups
           </Link>
-          <h1 className="mt-2 truncate font-display text-3xl tracking-[-0.03em]">
-            {group.name}
-          </h1>
+          <div className="mt-2 flex items-center gap-2">
+            <h1 className="min-w-0 truncate font-display text-3xl tracking-[-0.03em]">
+              {group.name}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Group settings"
+              className="shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-paper-sunken hover:text-ink"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18 6l-1.4 1.4M7.4 16.6 6 18M18 18l-1.4-1.4M7.4 7.4 6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
         <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
           Add expense
@@ -343,6 +371,15 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           <GroupCharts expenses={expenses} members={members} currency={currency} />
         )}
       </div>
+
+      {settingsOpen && (
+        <GroupSettingsSheet
+          open
+          onOpenChange={setSettingsOpen}
+          group={group}
+          expenseCount={expenses.length}
+        />
+      )}
 
       {adding && (
         <AddExpenseSheet
