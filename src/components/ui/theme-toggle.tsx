@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { cn } from '@/lib/cn'
 
 export type Theme = 'system' | 'light' | 'dark'
 
 export const THEME_STORAGE_KEY = 'baaki-theme'
+
+const CHANGE_EVENT = 'baaki:themechange'
 
 /**
  * Runs before first paint so a dark-mode reader never sees a white flash.
@@ -21,45 +23,53 @@ const LABELS: Record<Theme, string> = {
   dark: 'Dark',
 }
 
+/**
+ * The document element is the source of truth, not React state - the inline
+ * script above sets it before React exists. Subscribing to it rather than
+ * copying it into state in an effect keeps the two from disagreeing, and lets
+ * React handle the hydration difference itself.
+ */
+function subscribe(onChange: () => void) {
+  window.addEventListener(CHANGE_EVENT, onChange)
+  return () => window.removeEventListener(CHANGE_EVENT, onChange)
+}
+
+function getSnapshot(): Theme {
+  const value = document.documentElement.getAttribute('data-theme')
+  return value === 'light' || value === 'dark' ? value : 'system'
+}
+
+/** The server has no idea what the reader prefers, so it renders neutral. */
+function getServerSnapshot(): Theme {
+  return 'system'
+}
+
 function apply(theme: Theme) {
   const root = document.documentElement
   if (theme === 'system') root.removeAttribute('data-theme')
   else root.setAttribute('data-theme', theme)
+
   try {
     if (theme === 'system') localStorage.removeItem(THEME_STORAGE_KEY)
     else localStorage.setItem(THEME_STORAGE_KEY, theme)
   } catch {
     // Private browsing, or storage blocked. The theme still applies for now.
   }
+
+  window.dispatchEvent(new Event(CHANGE_EVENT))
 }
 
 export function ThemeToggle({ className }: { className?: string }) {
-  // Server renders 'system'; the real value arrives after mount, which is why
-  // the inline script above owns the first paint rather than this component.
-  const [theme, setTheme] = useState<Theme>('system')
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    const stored = document.documentElement.getAttribute('data-theme')
-    setTheme(stored === 'light' || stored === 'dark' ? stored : 'system')
-    setReady(true)
-  }, [])
-
-  const next = () => {
-    const value = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length]
-    setTheme(value)
-    apply(value)
-  }
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   return (
     <button
       type="button"
-      onClick={next}
+      onClick={() => apply(ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length])}
       title={LABELS[theme]}
       aria-label={`Theme: ${LABELS[theme]}. Click to change.`}
       className={cn(
         'flex h-9 w-9 items-center justify-center rounded-full border border-rule text-muted transition-colors hover:border-ink hover:text-ink',
-        !ready && 'opacity-0',
         className,
       )}
     >
