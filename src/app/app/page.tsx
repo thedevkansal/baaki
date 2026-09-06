@@ -10,7 +10,7 @@ import { Sheet } from '@/components/ui/sheet'
 import { formatMoney } from '@/lib/format'
 import { add, zero } from '@/lib/money'
 import { SUPPORTED_CURRENCIES } from '@/lib/fx'
-import { addPerson, createGroup, setMyName } from '@/lib/store/store'
+import { addPerson, createGroup, seedSampleGroup, setMyName } from '@/lib/store/store'
 import { useAppState, useGroupSummaries } from '@/lib/store/use-store'
 
 export default function GroupsPage() {
@@ -113,9 +113,17 @@ export default function GroupsPage() {
             A group is a trip, a flat, or a set of people you keep spending with. Add one
             and start putting bills in it.
           </p>
-          <Button variant="primary" className="mt-7" onClick={() => setCreating(true)}>
-            Create your first group
-          </Button>
+          <div className="mt-7 flex flex-wrap justify-center gap-2">
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              Create your first group
+            </Button>
+            <Button onClick={() => router.push(`/app/g/${seedSampleGroup().id}`)}>
+              Try a sample trip
+            </Button>
+          </div>
+          <p className="mt-4 text-xs text-muted">
+            The sample is a real group with real bills. Delete it whenever you like.
+          </p>
         </div>
       )}
 

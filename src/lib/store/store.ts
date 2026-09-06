@@ -272,6 +272,114 @@ export function deleteSettlement(settlementId: string) {
   })
 }
 
+/**
+ * A worked example, so an empty app can be judged on something.
+ *
+ * Real amounts, an uneven split, a bill somebody else paid and one in another
+ * currency: enough that the balances, the charts and the settle flow all have
+ * something to show without anyone having to type for five minutes first.
+ */
+export function seedSampleGroup(): Group {
+  const current = load()
+  const priya = { id: newId('p'), name: 'Priya' }
+  const rahul = { id: newId('p'), name: 'Rahul' }
+  const aman = { id: newId('p'), name: 'Aman' }
+  const me = current.meId
+
+  const group: Group = {
+    id: newId('g'),
+    name: 'Goa trip',
+    currency: 'INR',
+    memberIds: [me, priya.id, rahul.id, aman.id],
+    createdAt: new Date().toISOString(),
+    simplify: true,
+  }
+
+  const day = (back: number) =>
+    new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10)
+
+  const split = (total: bigint, ids: string[]) => {
+    const each = total / BigInt(ids.length)
+    const remainder = total - each * BigInt(ids.length)
+    return ids.map((personId, i) => ({
+      personId,
+      minor: (each + (BigInt(i) < remainder ? 1n : 0n)).toString(),
+    }))
+  }
+
+  const everyone = group.memberIds
+  const expenses: Expense[] = [
+    {
+      id: newId('e'),
+      groupId: group.id,
+      description: 'Beach house, three nights',
+      category: 'Stay',
+      occurredOn: day(6),
+      splitMode: 'equal',
+      payers: [{ personId: priya.id, minor: '1240000' }],
+      shares: split(1240000n, everyone),
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: newId('e'),
+      groupId: group.id,
+      description: 'Scooter rental',
+      category: 'Travel',
+      occurredOn: day(5),
+      splitMode: 'equal',
+      payers: [{ personId: me, minor: '240000' }],
+      shares: split(240000n, [me, rahul.id, aman.id]),
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: newId('e'),
+      groupId: group.id,
+      description: 'Dinner at Gunpowder',
+      category: 'Food',
+      occurredOn: day(4),
+      splitMode: 'equal',
+      payers: [
+        { personId: aman.id, minor: '320000' },
+        { personId: me, minor: '150000' },
+      ],
+      shares: split(470000n, everyone),
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: newId('e'),
+      groupId: group.id,
+      description: 'Scuba diving',
+      category: 'Entertainment',
+      occurredOn: day(3),
+      splitMode: 'equal',
+      payers: [{ personId: rahul.id, minor: '880000' }],
+      shares: split(880000n, [me, rahul.id]),
+      original: { currency: 'USD', minor: '10000', rateToGroupCurrency: '88' },
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: newId('e'),
+      groupId: group.id,
+      description: 'Airport cab',
+      category: 'Travel',
+      occurredOn: day(1),
+      splitMode: 'equal',
+      payers: [{ personId: priya.id, minor: '89000' }],
+      shares: split(89000n, everyone),
+      createdAt: new Date().toISOString(),
+    },
+  ]
+
+  commit({
+    ...current,
+    people: [...current.people, priya, rahul, aman],
+    groups: [...current.groups, group],
+    expenses: [...expenses.reverse(), ...current.expenses],
+  })
+
+  return group
+}
+
 /** Wipe everything. Offered in settings, never automatic. */
 export function resetEverything() {
   commit(emptyState())
