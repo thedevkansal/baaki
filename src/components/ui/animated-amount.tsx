@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { animate, useReducedMotion } from 'motion/react'
+import { useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/cn'
 import { balanceTone, formatMoney } from '@/lib/format'
 import { money, type Money } from '@/lib/money'
@@ -12,6 +12,9 @@ export interface AnimatedAmountProps {
   className?: string
 }
 
+const DURATION = 900
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 3)
+
 /**
  * An amount that counts to its new value instead of cutting to it.
  *
@@ -19,14 +22,17 @@ export interface AnimatedAmountProps {
  * That is the payoff of the whole product, so it gets the animation budget and
  * almost nothing else does.
  *
- * React renders the true figure; the animation only paints over it in between.
- * That ordering matters - anything driven purely by animation frames shows a
- * stale number on a page that is not compositing (a background tab, a headless
- * browser, a throttled device), and a wrong balance is worse than a static one.
+ * React renders the true figure. The count is driven by requestAnimationFrame
+ * directly, and the first character is only overwritten inside a frame
+ * callback, so a page that is not being drawn keeps the correct balance rather
+ * than whatever an animation left behind. An animation library cannot give
+ * that guarantee here: they write their opening keyframe synchronously, which
+ * paints the previous figure over the current one and strands it there if no
+ * frame ever follows. A wrong balance is worse than a still one.
  *
- * The intermediate frames go through a float, which is fine because they are
- * never anything but pixels. The value React renders is always the exact
- * integer, and no arithmetic here ever reaches the ledger.
+ * The interpolated frames go through a float, which is fine because they are
+ * never anything but pixels. The first and last thing shown is always the
+ * exact integer, and no arithmetic here reaches the ledger.
  */
 export function AnimatedAmount({ value, signed = false, className }: AnimatedAmountProps) {
   const reduced = useReducedMotion()
@@ -43,22 +49,28 @@ export function AnimatedAmount({ value, signed = false, className }: AnimatedAmo
 
     if (!node || reduced || from === target) return
 
-    const controls = animate(from, target, {
-      duration: 0.9,
-      ease: [0.22, 1, 0.36, 1],
-      onUpdate: (current) => {
+    let frame = 0
+    let startedAt = 0
+
+    const tick = (now: number) => {
+      if (!startedAt) startedAt = now
+      const progress = Math.min((now - startedAt) / DURATION, 1)
+      if (progress < 1) {
+        const current = from + (target - from) * easeOut(progress)
         node.textContent = formatMoney(money(BigInt(Math.round(current)), value.currency), {
           signed,
         })
-      },
-      // Land on the exact integer, never on whatever the last frame computed.
-      onComplete: () => {
+        frame = requestAnimationFrame(tick)
+      } else {
+        // Land on the exact integer, never on an interpolated frame.
         node.textContent = exact
-      },
-    })
+      }
+    }
+
+    frame = requestAnimationFrame(tick)
 
     return () => {
-      controls.stop()
+      cancelAnimationFrame(frame)
       node.textContent = exact
     }
   }, [target, exact, reduced, value.currency, signed])
