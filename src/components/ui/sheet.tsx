@@ -33,6 +33,11 @@ export function Sheet({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/25 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
+          // Radix points aria-describedby at a description element. Sheets
+          // without one previously rendered the title again, off screen, so it
+          // was announced twice. This says plainly that there is no
+          // description; Radix leaves the attribute off.
+          aria-describedby={undefined}
           className={cn(
             'fixed z-50 flex flex-col border-rule bg-paper',
             'inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t',
@@ -49,9 +54,7 @@ export function Sheet({
                 <Dialog.Description className="mt-1 text-sm text-muted">
                   {description}
                 </Dialog.Description>
-              ) : (
-                <Dialog.Description className="sr-only">{title}</Dialog.Description>
-              )}
+              ) : null}
             </div>
             <Dialog.Close
               aria-label="Close"

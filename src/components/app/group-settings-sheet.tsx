@@ -5,23 +5,53 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Field, inputClass } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
+import { buildGroupCsv, csvFilename, describeExport } from '@/lib/export'
 import { deleteGroup, updateGroup } from '@/lib/store/store'
-import type { Group } from '@/lib/store/types'
+import type { Expense, Group, Person, Settlement } from '@/lib/store/types'
 
 export function GroupSettingsSheet({
   open,
   onOpenChange,
   group,
   expenseCount,
+  members,
+  expenses,
+  settlements,
+  nameOf,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   group: Group
   expenseCount: number
+  members: Person[]
+  expenses: Expense[]
+  settlements: Settlement[]
+  nameOf: (personId: string) => string
 }) {
   const router = useRouter()
   const [name, setName] = useState(group.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const confirmedSettlements = settlements.filter((s) => s.status === 'confirmed').length
+
+  const download = () => {
+    const csv = buildGroupCsv({
+      groupName: group.name,
+      currency: group.currency,
+      members,
+      expenses,
+      settlements,
+      nameOf,
+    })
+    // A BOM so Excel opens rupee symbols and names in other scripts correctly.
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = csvFilename(group.name)
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <Sheet
@@ -77,6 +107,25 @@ export function GroupSettingsSheet({
               />
             </span>
           </button>
+        </div>
+
+        <div className="rounded-xl border border-rule px-4 py-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+            Export
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            {expenseCount === 0
+              ? 'Nothing to export yet.'
+              : `A spreadsheet with a column per person: ${describeExport(expenseCount, confirmedSettlements)}.`}
+          </p>
+          <Button
+            size="sm"
+            className="mt-4"
+            disabled={expenseCount === 0}
+            onClick={download}
+          >
+            Download CSV
+          </Button>
         </div>
 
         <div className="rounded-xl border border-rule px-4 py-4">

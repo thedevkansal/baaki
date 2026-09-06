@@ -378,6 +378,10 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           onOpenChange={setSettingsOpen}
           group={group}
           expenseCount={expenses.length}
+          members={members}
+          expenses={expenses}
+          settlements={settlements}
+          nameOf={ledger.nameOf}
         />
       )}
 
