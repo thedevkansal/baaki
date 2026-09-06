@@ -29,6 +29,8 @@
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Sets exactly one word: बाकी. */
+  --font-devanagari: var(--font-anek), var(--font-schibsted), sans-serif;
 
   /* --- motion --- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

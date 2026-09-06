@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from 'next'
-import { Bricolage_Grotesque, IBM_Plex_Mono, Schibsted_Grotesk } from 'next/font/google'
+import {
+  Anek_Devanagari,
+  Bricolage_Grotesque,
+  IBM_Plex_Mono,
+  Schibsted_Grotesk,
+} from 'next/font/google'
 import './globals.css'
 
 /** Display face. Balance figures and screen titles only - never body copy. */
@@ -13,6 +18,16 @@ const bricolage = Bricolage_Grotesque({
 const schibsted = Schibsted_Grotesk({
   variable: '--font-schibsted',
   subsets: ['latin'],
+  display: 'swap',
+})
+
+/**
+ * Devanagari, for exactly one word: बाकी. Bricolage has no Devanagari, so this
+ * is a necessity rather than a fourth voice - and it never sets anything else.
+ */
+const anek = Anek_Devanagari({
+  variable: '--font-anek',
+  subsets: ['devanagari'],
   display: 'swap',
 })
 
@@ -30,7 +45,7 @@ export const metadata: Metadata = {
     template: '%s · Baaki',
   },
   description:
-    'Split any bill, any way, with anyone. Settle up in one tap. Every feature free.',
+    'kitna baaki hai? Split any bill, any way, with anyone. Settle up over UPI in one tap. Every feature free.',
   applicationName: 'Baaki',
   appleWebApp: { capable: true, title: 'Baaki', statusBarStyle: 'default' },
 }
@@ -46,7 +61,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="en"
-      className={`${bricolage.variable} ${schibsted.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${bricolage.variable} ${schibsted.variable} ${plexMono.variable} ${anek.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
