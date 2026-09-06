@@ -103,7 +103,7 @@ export function Hero() {
   )
 
   return (
-    <section className="relative pt-16 pb-24 sm:pt-24">
+    <section className="relative pt-10 pb-24 sm:pt-16">
       <div className="mx-auto w-full max-w-5xl px-6">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
           Bill splitting, without the paywall
@@ -114,16 +114,27 @@ export function Hero() {
           <span className="text-neg">?</span>
         </h1>
 
-        <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted">
+        <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
           The question every group chat ends with. Baaki answers it the moment a bill lands
           — and settles it over UPI in one tap, without you leaving the app to retype an
           amount you already entered.
         </p>
+
+        <p
+          className="mt-14 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
+          aria-hidden
+        >
+          <span className="h-px w-10 bg-rule" />
+          the answer, live
+        </p>
       </div>
 
-      {/* The axis runs the full width of the viewport. It is the one thing on
-          this page allowed to break the column, because it is the idea. */}
-      <div className="relative mt-20 select-none">
+      {/* The answer deliberately starts below the fold. The question gets the
+          opening screen to itself; scrolling one notch is what answers it.
+
+          The axis runs the full width of the viewport - the one thing on this
+          page allowed to break the column, because it is the idea. */}
+      <div className="relative mt-36 select-none sm:mt-48">
         <Ruler />
 
         <div className="mx-auto w-full max-w-5xl px-6">
