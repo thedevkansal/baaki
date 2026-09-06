@@ -69,9 +69,24 @@ export function AnimatedAmount({ value, signed = false, className }: AnimatedAmo
 
     frame = requestAnimationFrame(tick)
 
+    /**
+     * Frames can stop part way through: the tab goes to the background, the
+     * device throttles, the page stops being drawn. Without this the figure
+     * freezes on whichever interpolated value it had reached, which is a
+     * wrong balance left on screen. A timer is not tied to compositing, so
+     * it lands the exact value no matter what happened to the animation.
+     */
+    const settle = () => {
+      node.textContent = exact
+    }
+    const failsafe = setTimeout(settle, DURATION + 100)
+    document.addEventListener('visibilitychange', settle)
+
     return () => {
       cancelAnimationFrame(frame)
-      node.textContent = exact
+      clearTimeout(failsafe)
+      document.removeEventListener('visibilitychange', settle)
+      settle()
     }
   }, [target, exact, reduced, value.currency, signed])
 

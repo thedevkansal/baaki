@@ -123,25 +123,29 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               return (
                 <div
                   key={`${t.from}-${t.to}`}
-                  className="flex flex-wrap items-center gap-2 rounded-xl border border-rule px-3.5 py-3"
+                  className="rounded-xl border border-rule px-4 py-3"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    Settle with {to.name}, {formatMoney(t.amount)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setWhy(index)}
-                    className="text-xs text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-                  >
-                    Why this?
-                  </button>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => setSettling({ to, amount: t.amount })}
-                  >
-                    Settle up
-                  </Button>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate text-sm">
+                      Settle with <span className="font-medium">{to.name}</span>
+                    </span>
+                    <span className="shrink-0 font-mono text-sm tabular-nums text-neg">
+                      {formatMoney(t.amount)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="flex-1"
+                      onClick={() => setSettling({ to, amount: t.amount })}
+                    >
+                      Settle up
+                    </Button>
+                    <Button size="sm" onClick={() => setWhy(index)}>
+                      Why this?
+                    </Button>
+                  </div>
                 </div>
               )
             })}
