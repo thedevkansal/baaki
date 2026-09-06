@@ -24,7 +24,8 @@ import {
 const minor = (name: string) => bigint(name, { mode: 'bigint' })
 
 const id = () => uuid('id').primaryKey().defaultRandom()
-const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+const createdAt = () =>
+  timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 
 /**
  * A person who can sign in. Ghosts, people added by name alone, live in
@@ -107,7 +108,9 @@ export const expenses = pgTable(
       .references(() => groups.id, { onDelete: 'cascade' }),
     description: text('description').notNull(),
     category: text('category').notNull().default('General'),
-    occurredOn: date('occurred_on').notNull().default(sql`current_date`),
+    occurredOn: date('occurred_on')
+      .notNull()
+      .default(sql`current_date`),
     splitMode: text('split_mode').notNull().default('equal'),
     /** The group's currency. Amounts below are already converted into it. */
     currency: char('currency', { length: 3 }).notNull(),

@@ -8,9 +8,11 @@ const INR = 'INR'
 const U = undefined
 
 const people = (values: (string | undefined)[], selected = values.map(() => true)) =>
-  values.map(
-    (value, i): SplitParticipant => ({ ref: `p${i}`, selected: selected[i], value }),
-  )
+  values.map((value, i): SplitParticipant => ({
+    ref: `p${i}`,
+    selected: selected[i],
+    value,
+  }))
 
 const minors = (r: { shares: { amount: { minor: bigint } }[] }) =>
   r.shares.map((s) => s.amount.minor)
@@ -19,7 +21,12 @@ describe('equal', () => {
   it('splits evenly and gives the odd paisa to someone', () => {
     const r = buildShares(fromMajor('100', INR), 'equal', people([U, U, U]), 0)
     expect(minors(r)).toEqual([3334n, 3333n, 3333n])
-    expect(sum(r.shares.map((s) => s.amount), INR).minor).toBe(10000n)
+    expect(
+      sum(
+        r.shares.map((s) => s.amount),
+        INR,
+      ).minor,
+    ).toBe(10000n)
   })
 
   it('leaves out anyone not in the split', () => {
@@ -58,7 +65,12 @@ describe('percent', () => {
       people(['33.33', '33.33', '33.34']),
       0,
     )
-    expect(sum(r.shares.map((s) => s.amount), INR).minor).toBe(100000n)
+    expect(
+      sum(
+        r.shares.map((s) => s.amount),
+        INR,
+      ).minor,
+    ).toBe(100000n)
     expect(minors(r)).toEqual([33330n, 33330n, 33340n])
   })
 
@@ -90,14 +102,14 @@ describe('exact', () => {
 describe('adjustment', () => {
   it('splits the rest evenly after taking the extras off the top', () => {
     // One person had a 200 starter to themselves; the other 700 splits three ways.
-    const r = buildShares(
-      fromMajor('900', INR),
-      'adjustment',
-      people(['200', '0', '0']),
-      0,
-    )
+    const r = buildShares(fromMajor('900', INR), 'adjustment', people(['200', '0', '0']), 0)
     expect(minors(r)).toEqual([43334n, 23333n, 23333n])
-    expect(sum(r.shares.map((s) => s.amount), INR).minor).toBe(90000n)
+    expect(
+      sum(
+        r.shares.map((s) => s.amount),
+        INR,
+      ).minor,
+    ).toBe(90000n)
   })
 
   it('refuses adjustments larger than the bill', () => {
@@ -110,7 +122,12 @@ describe('adjustment', () => {
     // Someone skipped the starters, so they pay 80 less and the rest absorb it.
     const r = buildShares(fromMajor('100', INR), 'adjustment', people(['-80', '0']), 0)
     expect(minors(r)).toEqual([1000n, 9000n])
-    expect(sum(r.shares.map((s) => s.amount), INR).minor).toBe(10000n)
+    expect(
+      sum(
+        r.shares.map((s) => s.amount),
+        INR,
+      ).minor,
+    ).toBe(10000n)
   })
 
   it('refuses to leave someone owing a negative amount', () => {
