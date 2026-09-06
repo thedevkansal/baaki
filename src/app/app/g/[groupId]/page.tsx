@@ -35,6 +35,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [settling, setSettling] = useState<{ to: Person; amount: Money } | null>(null)
   const [why, setWhy] = useState<number | null>(null)
   const [focused, setFocused] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
   const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
 
@@ -55,6 +56,23 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const currency = group.currency
   const pending = settlements.filter((s) => s.status === 'proposed')
   const focusedPerson = yourSplit.find((s) => s.person.id === focused)
+
+  // Searching your own history is a Pro feature over there. It matches the
+  // description, the category and whoever paid, because those are the three
+  // things people actually remember about a bill.
+  const needle = query.trim().toLowerCase()
+  const visibleExpenses = needle
+    ? expenses.filter((expense) =>
+        [
+          expense.description,
+          expense.category,
+          ...expense.payers.map((p) => ledger.nameOf(p.personId)),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle),
+      )
+    : expenses
   const myTransfers = ledger.transfers
     .map((t, index) => ({ t, index }))
     .filter(({ t }) => personIdOf(t.from) === state.meId)
@@ -216,10 +234,12 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <Avatar name={person.name} />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {person.name}
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="min-w-0 truncate text-sm">{person.name}</span>
                     {person.id === state.meId && (
-                      <span className="ml-2 text-xs text-muted">you</span>
+                      <span className="shrink-0 rounded-full border border-rule px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                        you
+                      </span>
                     )}
                   </span>
                   <span
@@ -244,61 +264,79 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         )}
 
         {tab === 'expenses' && (
-          <ul className="space-y-2">
-            {expenses.map((expense, index) => {
-              const total = expense.shares.reduce((acc, s) => acc + BigInt(s.minor), 0n)
-              const paidBy = expense.payers.map((p) => ledger.nameOf(p.personId)).join(', ')
-              const yourShare =
-                expense.shares.find((s) => s.personId === state.meId)?.minor ?? '0'
-              return (
-                <li
-                  key={expense.id}
-                  className="rise group flex items-center gap-4 rounded-xl border border-rule px-4 py-3 transition-colors hover:border-ink"
-                  style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{expense.description}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted">
-                      {paidBy || 'nobody'} paid · {expense.category} · {expense.occurredOn}
-                      {expense.original &&
-                        ` · ${formatMoney(
-                          money(BigInt(expense.original.minor), expense.original.currency),
-                        )}`}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="font-mono text-sm tabular-nums">
-                      {formatMoney(money(total, currency))}
-                    </p>
-                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-                      you {formatMoney(money(BigInt(yourShare), currency))}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteExpense(expense.id)}
-                    aria-label={`Delete ${expense.description}`}
-                    className="shrink-0 rounded-full p-1.5 text-muted opacity-0 transition-opacity hover:text-neg focus-visible:opacity-100 group-hover:opacity-100"
+          <>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search bills, categories, who paid"
+              aria-label="Search expenses"
+              className={cn(inputClass, 'mb-3')}
+            />
+            <ul className="space-y-2">
+              {visibleExpenses.map((expense, index) => {
+                const total = expense.shares.reduce((acc, s) => acc + BigInt(s.minor), 0n)
+                const paidBy = expense.payers
+                  .map((p) => ledger.nameOf(p.personId))
+                  .join(', ')
+                const yourShare =
+                  expense.shares.find((s) => s.personId === state.meId)?.minor ?? '0'
+                return (
+                  <li
+                    key={expense.id}
+                    className="rise group flex items-center gap-4 rounded-xl border border-rule px-4 py-3 transition-colors hover:border-ink"
+                    style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
                   >
-                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
-                      <path
-                        d="M6 6l12 12M18 6L6 18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{expense.description}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted">
+                        {paidBy || 'nobody'} paid · {expense.category} ·{' '}
+                        {expense.occurredOn}
+                        {expense.original &&
+                          ` · ${formatMoney(
+                            money(
+                              BigInt(expense.original.minor),
+                              expense.original.currency,
+                            ),
+                          )}`}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-mono text-sm tabular-nums">
+                        {formatMoney(money(total, currency))}
+                      </p>
+                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+                        you {formatMoney(money(BigInt(yourShare), currency))}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteExpense(expense.id)}
+                      aria-label={`Delete ${expense.description}`}
+                      className="shrink-0 rounded-full p-1.5 text-muted opacity-0 transition-opacity hover:text-neg focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+                        <path
+                          d="M6 6l12 12M18 6L6 18"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                  </li>
+                )
+              })}
+              {visibleExpenses.length === 0 && (
+                <li className="rounded-xl border border-dashed border-rule px-6 py-12 text-center text-sm text-muted">
+                  {expenses.length === 0
+                    ? 'Add the first expense.'
+                    : `Nothing matches "${query.trim()}".`}
                 </li>
-              )
-            })}
-            {expenses.length === 0 && (
-              <li className="rounded-xl border border-dashed border-rule px-6 py-12 text-center text-sm text-muted">
-                Add the first expense.
-              </li>
-            )}
-          </ul>
+              )}
+            </ul>
+          </>
         )}
 
         {tab === 'charts' && (
