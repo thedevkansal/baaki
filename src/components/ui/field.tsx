@@ -46,7 +46,10 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       className={cn(
-        'flex gap-1 overflow-x-auto rounded-full border border-rule p-1',
+        // Wraps rather than scrolls. Five split modes do not fit one row in a
+        // sheet on a phone, and a horizontal scrollbar hides the options that
+        // matter most while looking like a browser artefact.
+        'flex flex-wrap gap-1 rounded-2xl border border-rule p-1',
         className,
       )}
       role="tablist"

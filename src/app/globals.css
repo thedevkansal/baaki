@@ -29,8 +29,17 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-body {
+/**
+ * The ground lives on <html> so the grain layer below can sit behind every
+ * child of <body> without those children needing a stacking context of their
+ * own. That matters: anything portalled into <body>, every dialog in the app,
+ * must keep its own positioning.
+ */
+html {
   background: var(--paper);
+}
+
+body {
   color: var(--ink);
   font-family: var(--font-body);
   font-synthesis-weight: none;
@@ -42,21 +51,20 @@ body {
  * One fixed layer of fractal noise over the whole page. It is the difference
  * between a surface and a fill: without it both themes read as flat swatches,
  * which is what makes a minimal interface look unfinished rather than quiet.
- * Sits above the background, below everything else, and never takes a click.
+ *
+ * It sits at z-index -1, behind content and above the ground on <html>. An
+ * earlier version forced every child of <body> to be positioned so it could
+ * layer above them, which quietly overrode the fixed positioning of every
+ * portalled dialog and pushed them off screen.
  */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   opacity: var(--grain-opacity);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
-}
-
-body > * {
-  position: relative;
-  z-index: 1;
 }
 
 :focus-visible {
