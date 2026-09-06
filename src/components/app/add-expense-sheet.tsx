@@ -160,7 +160,7 @@ export function AddExpenseSheet({
           hint={
             spent && amountText.trim() !== toMajorString(spent)
               ? `= ${formatMoney(spent)}`
-              : 'Type the maths if you like — 450+120*2 works.'
+              : 'Type the maths if you like. 450+120*2 works.'
           }
           error={amountText.trim() !== '' && !spent ? 'That is not an amount.' : undefined}
         >
@@ -189,7 +189,7 @@ export function AddExpenseSheet({
 
         {isForeign && (
           <Field
-            label={`Rate — 1 ${spentCurrency} in ${currency}`}
+            label={`Rate: 1 ${spentCurrency} in ${currency}`}
             hint={
               total
                 ? `${formatMoney(spent!)} becomes ${formatMoney(total)} in this group.`

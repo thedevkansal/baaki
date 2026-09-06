@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { cn } from '@/lib/cn'
 
 export type Theme = 'system' | 'light' | 'dark'
@@ -8,12 +8,6 @@ export type Theme = 'system' | 'light' | 'dark'
 export const THEME_STORAGE_KEY = 'baaki-theme'
 
 const CHANGE_EVENT = 'baaki:themechange'
-
-/**
- * Runs before first paint so a dark-mode reader never sees a white flash.
- * Kept as a string because it has to be inlined into <head> ahead of React.
- */
-export const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}`
 
 const ORDER: Theme[] = ['system', 'light', 'dark']
 
@@ -24,10 +18,15 @@ const LABELS: Record<Theme, string> = {
 }
 
 /**
- * The document element is the source of truth, not React state - the inline
- * script above sets it before React exists. Subscribing to it rather than
- * copying it into state in an effect keeps the two from disagreeing, and lets
- * React handle the hydration difference itself.
+ * The document element is the source of truth, not React state, and the CSS
+ * already follows the operating system on its own. Only an explicit override
+ * needs restoring, which happens on mount.
+ *
+ * The obvious alternative, a blocking script inlined ahead of React, removes
+ * the one-frame flash an override sees but makes React render a script tag it
+ * warns about; the other, a cookie the server reads, moves the flash into a
+ * hydration mismatch on `<html>`. Neither is worth it for a single frame that
+ * only readers who picked the opposite of their system setting ever see.
  */
 function subscribe(onChange: () => void) {
   window.addEventListener(CHANGE_EVENT, onChange)
@@ -44,16 +43,27 @@ function getServerSnapshot(): Theme {
   return 'system'
 }
 
-function apply(theme: Theme) {
+function readStored(): Theme | null {
+  try {
+    const value = localStorage.getItem(THEME_STORAGE_KEY)
+    return value === 'light' || value === 'dark' ? value : null
+  } catch {
+    return null
+  }
+}
+
+function apply(theme: Theme, persist: boolean) {
   const root = document.documentElement
   if (theme === 'system') root.removeAttribute('data-theme')
   else root.setAttribute('data-theme', theme)
 
-  try {
-    if (theme === 'system') localStorage.removeItem(THEME_STORAGE_KEY)
-    else localStorage.setItem(THEME_STORAGE_KEY, theme)
-  } catch {
-    // Private browsing, or storage blocked. The theme still applies for now.
+  if (persist) {
+    try {
+      if (theme === 'system') localStorage.removeItem(THEME_STORAGE_KEY)
+      else localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch {
+      // Private browsing, or storage blocked. The theme still applies for now.
+    }
   }
 
   window.dispatchEvent(new Event(CHANGE_EVENT))
@@ -62,10 +72,19 @@ function apply(theme: Theme) {
 export function ThemeToggle({ className }: { className?: string }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
+  // Restores a saved override. This writes a DOM attribute and notifies the
+  // store; it never copies anything into React state.
+  useEffect(() => {
+    const stored = readStored()
+    if (stored && document.documentElement.getAttribute('data-theme') !== stored) {
+      apply(stored, false)
+    }
+  }, [])
+
   return (
     <button
       type="button"
-      onClick={() => apply(ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length])}
+      onClick={() => apply(ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length], true)}
       title={LABELS[theme]}
       aria-label={`Theme: ${LABELS[theme]}. Click to change.`}
       className={cn(

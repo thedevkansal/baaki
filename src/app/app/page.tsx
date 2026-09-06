@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
-import { Avatar, Field, SegmentedControl, inputClass } from '@/components/ui/field'
+import { Avatar, Field, inputClass } from '@/components/ui/field'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { formatMoney } from '@/lib/format'
@@ -68,11 +68,11 @@ export default function GroupsPage() {
       )}
 
       <ul className="mt-8 space-y-3">
-        {summaries.map(({ group, members, expenseCount, yourNet }) => (
-          <li key={group.id}>
+        {summaries.map(({ group, members, expenseCount, yourNet }, index) => (
+          <li key={group.id} className="rise" style={{ animationDelay: `${index * 60}ms` }}>
             <Link
               href={`/app/g/${group.id}`}
-              className="flex items-center gap-4 rounded-2xl border border-rule bg-paper-raised px-5 py-4 transition-colors hover:border-ink"
+              className="flex items-center gap-4 rounded-2xl border border-rule bg-paper-raised px-5 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink hover:shadow-[0_6px_20px_-12px_var(--ink)]"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{group.name}</p>
@@ -134,7 +134,7 @@ export default function GroupsPage() {
           />
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Everything is stored on this device only — no account, no server, nothing leaves.
+          Everything is stored on this device only. No account, no server, nothing leaves.
           Accounts and sync are next.
         </p>
       </section>
@@ -168,7 +168,7 @@ export default function GroupsPage() {
 
           <Field
             label="Who else is in it"
-            hint="Separate names with commas. No email or phone needed — you can add UPI IDs later."
+            hint="Separate names with commas. No email or phone needed. You can add UPI IDs later."
           >
             <input
               className={inputClass}
@@ -180,16 +180,19 @@ export default function GroupsPage() {
 
           <Field
             label="Currency"
-            hint="Balances for this group are carried in this currency."
+            hint="Balances for this group are carried in this currency. A single bill can still be spent in another one."
           >
-            <SegmentedControl
+            <select
+              className={inputClass}
               value={currency}
-              onChange={setCurrency}
-              options={SUPPORTED_CURRENCIES.slice(0, 6).map((code) => ({
-                value: code,
-                label: code,
-              }))}
-            />
+              onChange={(event) => setCurrency(event.target.value)}
+            >
+              {SUPPORTED_CURRENCIES.map((code) => (
+                <option key={code} value={code}>
+                  {code === 'INR' ? 'INR, Indian rupee' : code}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
       </Sheet>

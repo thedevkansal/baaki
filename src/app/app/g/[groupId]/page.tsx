@@ -123,7 +123,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   className="flex flex-wrap items-center gap-2 rounded-xl border border-rule px-3.5 py-3"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm">
-                    Settle with {to.name} — {formatMoney(t.amount)}
+                    Settle with {to.name}, {formatMoney(t.amount)}
                   </span>
                   <button
                     type="button"
@@ -160,7 +160,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   {iPaid ? (
                     <>
                       You paid <span className="font-medium">{ledger.nameOf(s.toId)}</span>{' '}
-                      {amount} — waiting for them to confirm
+                      {amount}. Waiting for them to confirm
                     </>
                   ) : (
                     <>
@@ -202,10 +202,11 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         {tab === 'balances' && (
           <>
             <ul className="space-y-2">
-              {ledger.balances.map(({ person, net }) => (
+              {ledger.balances.map(({ person, net }, index) => (
                 <li
                   key={person.id}
-                  className="flex items-center gap-3 rounded-xl border border-rule px-4 py-3"
+                  className="rise flex items-center gap-3 rounded-xl border border-rule px-4 py-3 transition-colors hover:border-ink"
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <Avatar name={person.name} />
                   <span className="min-w-0 flex-1 truncate text-sm">
@@ -237,7 +238,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
 
         {tab === 'expenses' && (
           <ul className="space-y-2">
-            {expenses.map((expense) => {
+            {expenses.map((expense, index) => {
               const total = expense.shares.reduce((acc, s) => acc + BigInt(s.minor), 0n)
               const paidBy = expense.payers.map((p) => ledger.nameOf(p.personId)).join(', ')
               const yourShare =
@@ -245,7 +246,8 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               return (
                 <li
                   key={expense.id}
-                  className="group flex items-center gap-4 rounded-xl border border-rule px-4 py-3"
+                  className="rise group flex items-center gap-4 rounded-xl border border-rule px-4 py-3 transition-colors hover:border-ink"
+                  style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{expense.description}</p>

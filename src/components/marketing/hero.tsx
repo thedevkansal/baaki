@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
 import { netBalances, pairwiseDebts } from '@/lib/ledger/balances'
 import type { ExpenseEntry, ParticipantRef } from '@/lib/ledger/types'
+import { Ruler } from '@/components/ui/ruler'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { fromMajor, money, splitEqually, zero, type Money } from '@/lib/money'
@@ -116,7 +117,7 @@ export function Hero() {
 
         <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
           The question every group chat ends with. Baaki answers it the moment a bill lands
-          — and settles it over UPI in one tap, without you leaving the app to retype an
+          and settles it over UPI in one tap, without you leaving the app to retype an
           amount you already entered.
         </p>
 
@@ -135,7 +136,7 @@ export function Hero() {
           The axis runs the full width of the viewport - the one thing on this
           page allowed to break the column, because it is the idea. */}
       <div className="relative mt-36 select-none sm:mt-48">
-        <Ruler />
+        <Ruler className="absolute inset-x-0 top-0" />
 
         <div className="mx-auto w-full max-w-5xl px-6">
           <div className="relative -mt-px flex flex-col items-center pt-10">
@@ -194,7 +195,7 @@ export function Hero() {
 
       <div className="mx-auto mt-16 w-full max-w-5xl px-6">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
-          Try it — add a bill
+          Try it, add a bill
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -248,38 +249,6 @@ export function Hero() {
         </p>
       </div>
     </section>
-  )
-}
-
-/**
- * A number line, drawn as one. The ticks read as a ruler rather than as
- * decoration, and they fade out at both ends so the axis has no hard stop.
- */
-function Ruler() {
-  return (
-    <div className="pointer-events-none absolute inset-x-0 top-0" aria-hidden>
-      <div
-        className="h-3 w-full opacity-70"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px 12px)',
-          maskImage:
-            'linear-gradient(to right, transparent, black 12%, black 88%, transparent)',
-          WebkitMaskImage:
-            'linear-gradient(to right, transparent, black 12%, black 88%, transparent)',
-        }}
-      />
-      <div
-        className="h-px w-full bg-rule"
-        style={{
-          maskImage:
-            'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
-          WebkitMaskImage:
-            'linear-gradient(to right, transparent, black 8%, black 92%, transparent)',
-        }}
-      />
-      <div className="mx-auto h-4 w-px bg-ink/40" />
-    </div>
   )
 }
 

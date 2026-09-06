@@ -2,10 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Hero } from '@/components/marketing/hero'
 import { Proof } from '@/components/marketing/proof'
-import { REPO, SiteHeader, Wordmark } from '@/components/marketing/site-header'
+import { SiteFooter } from '@/components/site-footer'
 
 export const metadata: Metadata = {
-  title: 'Baaki — kitna baaki hai?',
+  title: 'Baaki, kitna baaki hai?',
 }
 
 /** Every one of these is behind Splitwise Pro. Source: splitwise.com/pro */
@@ -24,8 +24,6 @@ const PAYWALLED = [
 export default function LandingPage() {
   return (
     <>
-      <SiteHeader />
-
       <main className="flex-1">
         <Hero />
         <Proof />
@@ -44,7 +42,7 @@ export default function LandingPage() {
               </h2>
               <p className="mt-6 max-w-md leading-relaxed text-muted">
                 Splitwise put a daily cap on how many expenses you can add, then moved
-                search, charts, receipt scanning and multiple payers behind Pro — and ran
+                search, charts, receipt scanning and multiple payers behind Pro, and ran
                 video ads in an app where people track real money.
               </p>
               <p className="mt-4 max-w-md leading-relaxed text-muted">
@@ -94,7 +92,7 @@ export default function LandingPage() {
               <p>
                 So settling is two-sided: you say you paid, and the other person confirms
                 it. Balances move only then. It is the same trust your group already runs on
-                — we just stop pretending otherwise, and we never show a payment as verified
+                We just stop pretending otherwise, and we never show a payment as verified
                 when it isn&rsquo;t.
               </p>
             </div>
@@ -116,23 +114,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-rule px-6 py-14">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <Wordmark />
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">
-              Built in the open. The ledger, the splitting maths and the UPI logic are all
-              readable — and tested to the paisa.
-            </p>
-          </div>
-          <a
-            href={REPO}
-            className="text-sm text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-          >
-            github.com/thedevkansal/baaki
-          </a>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   )
 }

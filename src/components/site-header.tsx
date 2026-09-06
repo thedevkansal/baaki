@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { cn } from '@/lib/cn'
-
-export const REPO = 'https://github.com/thedevkansal/baaki'
 
 const LINKS = [
   { href: '/#how', label: 'How it works' },
@@ -23,11 +22,16 @@ export function Wordmark({ className }: { className?: string }) {
 }
 
 /**
- * The bar stays put and only grows a hairline once you have scrolled past the
- * headline, so nothing competes with the question at the top of the page.
+ * One bar, every page.
+ *
+ * The navigation does not reshuffle itself between the site and the app: the
+ * same links sit in the same places whether you are reading about Baaki or
+ * using it, so nothing has to be relearned on the way in.
  */
 export function SiteHeader() {
+  const pathname = usePathname()
   const [scrolled, setScrolled] = useState(false)
+  const inApp = pathname.startsWith('/app')
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -40,7 +44,9 @@ export function SiteHeader() {
     <header
       className={cn(
         'sticky top-0 z-50 transition-colors duration-200',
-        scrolled ? 'border-b border-rule bg-paper/85 backdrop-blur-md' : 'bg-transparent',
+        scrolled || inApp
+          ? 'border-b border-rule bg-paper/85 backdrop-blur-md'
+          : 'bg-transparent',
       )}
     >
       <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-6 py-4">
@@ -61,18 +67,15 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
-          <a
-            href={REPO}
-            className="hidden rounded-full px-3 py-2 text-sm text-muted transition-colors hover:bg-paper-sunken hover:text-ink sm:block"
-          >
-            Source
-          </a>
           <ThemeToggle />
           <Link
-            href="/app"
-            className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+            href={inApp ? '/app' : '/app'}
+            className={cn(
+              'rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90',
+              'bg-ink text-paper',
+            )}
           >
-            Open Baaki
+            {inApp ? 'Your groups' : 'Open Baaki'}
           </Link>
         </div>
       </div>

@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo } from 'react'
+import { SectionMark } from '@/components/ui/ruler'
+import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { money } from '@/lib/money'
 import type { Expense, Person } from '@/lib/store/types'
@@ -11,51 +13,40 @@ import type { Expense, Person } from '@/lib/store/types'
  * Splitwise puts "charts and graphs" behind Pro. These are the two questions a
  * group actually asks: where did the money go, and who has been carrying it.
  *
- * Both are magnitude comparisons, not identity, so they use one hue and let
- * length do the work - no categorical palette, no extra colours in a system
- * that deliberately has six. The paid-versus-share pair is the exception: it
- * has two series, so it takes the two poles of the axis and a legend.
+ * Both are magnitude comparisons rather than identity, so they use one hue and
+ * let length do the work. No categorical palette, no extra colours in a system
+ * that deliberately has six. The paid-against-share pair is the exception: two
+ * series, so it takes the two poles of the axis and a legend.
+ *
+ * Bars grow from zero on arrival. The growth is the point: a bar that is
+ * already at full length is a number in a costume, one that draws itself shows
+ * you the size of the thing.
  */
 
-interface Row {
-  label: string
-  value: bigint
-}
-
-function Bars({
-  rows,
-  currency,
-  emptyLabel,
+function Bar({
+  fraction,
+  tone,
+  index,
 }: {
-  rows: Row[]
-  currency: string
-  emptyLabel: string
+  fraction: number
+  tone: 'pos' | 'neg'
+  index: number
 }) {
-  const max = rows.reduce((acc, r) => (r.value > acc ? r.value : acc), 0n)
-
-  if (rows.length === 0 || max === 0n) {
-    return <p className="py-6 text-sm text-muted">{emptyLabel}</p>
-  }
-
   return (
-    <ul className="mt-4 space-y-3">
-      {rows.map((row) => (
-        <li key={row.label}>
-          <div className="flex items-baseline justify-between gap-4">
-            <span className="min-w-0 truncate text-sm">{row.label}</span>
-            <span className="shrink-0 font-mono text-sm tabular-nums text-muted">
-              {formatMoney(money(row.value, currency))}
-            </span>
-          </div>
-          <div className="mt-1.5 h-1.5 w-full rounded-full bg-paper-sunken">
-            <div
-              className="h-full rounded-full bg-pos"
-              style={{ width: `${(Number(row.value) / Number(max)) * 100}%` }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-sunken">
+      <div
+        className={cn(
+          'grow-x h-full w-full rounded-full',
+          tone === 'pos' ? 'bg-pos' : 'bg-neg',
+        )}
+        style={{
+          transform: `scaleX(${Math.max(fraction, 0)})`,
+          // Staggered by duration rather than delay, so no bar is ever
+          // waiting at zero length.
+          ['--grow-duration' as string]: `${520 + index * 70}ms`,
+        }}
+      />
+    </div>
   )
 }
 
@@ -99,35 +90,62 @@ export function GroupCharts({
     }
   }, [expenses, members])
 
+  const categoryMax = byCategory.reduce((acc, r) => (r.value > acc ? r.value : acc), 0n)
   const personMax = byPerson.reduce(
     (acc, r) => (r.paid > acc ? r.paid : r.consumed > acc ? r.consumed : acc),
     0n,
   )
 
+  const share = (value: bigint, max: bigint) =>
+    max === 0n ? 0 : Number(value) / Number(max)
+
+  if (expenses.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-rule px-6 py-14 text-center">
+        <p className="font-display text-xl tracking-[-0.02em]">Nothing to chart yet</p>
+        <p className="mt-2 text-sm text-muted">Add a bill and the shape appears here.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       <section>
         <div className="flex items-baseline justify-between gap-4">
-          <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-            Where it went
-          </h3>
+          <SectionMark label="Where it went" />
           <span className="font-mono text-sm tabular-nums text-muted">
-            {formatMoney(money(total, currency))} total
+            {formatMoney(money(total, currency))}
           </span>
         </div>
-        <Bars
-          rows={byCategory}
-          currency={currency}
-          emptyLabel="No expenses yet, so nothing to chart."
-        />
+
+        <ul className="mt-6 space-y-4">
+          {byCategory.map((row, index) => (
+            <li
+              key={row.label}
+              className="group/row rounded-lg px-2 py-1 transition-colors hover:bg-paper-sunken"
+              title={`${row.label}: ${formatMoney(money(row.value, currency))} of ${formatMoney(money(total, currency))}`}
+            >
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="min-w-0 truncate text-sm">{row.label}</span>
+                <span className="shrink-0 font-mono text-sm tabular-nums text-muted">
+                  {formatMoney(money(row.value, currency))}
+                  <span className="ml-2 opacity-0 transition-opacity group-hover/row:opacity-100">
+                    {Math.round(share(row.value, total) * 100)}%
+                  </span>
+                </span>
+              </div>
+              <div className="mt-2">
+                <Bar fraction={share(row.value, categoryMax)} tone="pos" index={index} />
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section>
-        <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-          Who has been carrying it
-        </h3>
+        <SectionMark label="Who has been carrying it" />
 
-        <div className="mt-3 flex items-center gap-5 text-xs text-muted">
+        <div className="mt-4 flex items-center gap-5 text-xs text-muted">
           <span className="inline-flex items-center gap-2">
             <span className="h-2 w-4 rounded-full bg-pos" aria-hidden /> paid
           </span>
@@ -136,37 +154,27 @@ export function GroupCharts({
           </span>
         </div>
 
-        {personMax === 0n ? (
-          <p className="py-6 text-sm text-muted">Nothing spent yet.</p>
-        ) : (
-          <ul className="mt-4 space-y-4">
-            {byPerson.map(({ person, paid, consumed }) => (
-              <li key={person.id}>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="min-w-0 truncate text-sm">{person.name}</span>
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
-                    {formatMoney(money(paid, currency))} paid ·{' '}
-                    {formatMoney(money(consumed, currency))} used
-                  </span>
-                </div>
-                <div className="mt-1.5 space-y-0.5">
-                  <div className="h-1.5 w-full rounded-full bg-paper-sunken">
-                    <div
-                      className="h-full rounded-full bg-pos"
-                      style={{ width: `${(Number(paid) / Number(personMax)) * 100}%` }}
-                    />
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-paper-sunken">
-                    <div
-                      className="h-full rounded-full bg-neg"
-                      style={{ width: `${(Number(consumed) / Number(personMax)) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="mt-6 space-y-5">
+          {byPerson.map(({ person, paid, consumed }, index) => (
+            <li
+              key={person.id}
+              className="rounded-lg px-2 py-1 transition-colors hover:bg-paper-sunken"
+              title={`${person.name} paid ${formatMoney(money(paid, currency))} and used ${formatMoney(money(consumed, currency))}`}
+            >
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="min-w-0 truncate text-sm">{person.name}</span>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
+                  {formatMoney(money(paid, currency))} paid ·{' '}
+                  {formatMoney(money(consumed, currency))} used
+                </span>
+              </div>
+              <div className="mt-2 space-y-1">
+                <Bar fraction={share(paid, personMax)} tone="pos" index={index} />
+                <Bar fraction={share(consumed, personMax)} tone="neg" index={index + 1} />
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   )

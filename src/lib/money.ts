@@ -115,7 +115,7 @@ export function sum(amounts: readonly Money[], currency: CurrencyCode): Money {
  *
  * Largest-remainder method: everyone gets the floor of their exact share, then
  * the leftover minor units go to whoever was cut by the most. Ties are broken
- * by an index rotation driven by `seed` — pass a per-expense seed so the same
+ * by an index rotation driven by `seed`. Pass a per-expense seed so the same
  * person doesn't absorb the extra paisa on every single bill.
  *
  * Weights of zero never receive a leftover unit.

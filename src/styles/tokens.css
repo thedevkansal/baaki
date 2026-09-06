@@ -2,28 +2,36 @@
  * Baaki design tokens.
  *
  * The whole system comes from one idea: a balance is a signed number. So the
- * palette is an axis with two poles - teal when you are owed, plum when you
- * owe - and everything that is not a signed amount is ink on paper.
+ * palette is an axis with two poles, teal when you are owed and plum when you
+ * owe, and everything that is not a signed amount is ink on paper.
  *
  * Six colour tokens. There is deliberately no seventh, and no accent colour.
  * If you reach for one, the answer is ink.
+ *
+ * Both grounds are warm rather than neutral. A flat near-black with a single
+ * bright accent is the look every dark product defaults to; the ink here
+ * carries a trace of the plum pole so the two poles sit in the surface rather
+ * than on top of it.
  */
 
 :root {
   /* --- the six --- */
-  --paper: #f7f6f3;
-  --ink: #16181d;
-  --muted: #6e7178;
-  --rule: #dfdcd4;
+  --paper: #f7f5f0;
+  --ink: #16151a;
+  --muted: #6e6b75;
+  --rule: #ddd9d0;
   --pos: #0b6e63; /* owed to you */
   --neg: #8b3a62; /* you owe */
 
   /* --- surfaces derived from the six, never new hues --- */
-  --paper-raised: #fffefb;
-  --paper-sunken: #efede7;
+  --paper-raised: #fffdf8;
+  --paper-sunken: #edeae2;
   --pos-wash: color-mix(in oklab, var(--pos) 8%, transparent);
   --neg-wash: color-mix(in oklab, var(--neg) 8%, transparent);
   --focus: var(--ink);
+
+  /* Paper has tooth. Grain is what stops a flat fill reading as a screenshot. */
+  --grain-opacity: 0.035;
 
   /* --- type --- */
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
@@ -40,30 +48,32 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --paper: #121316;
-    --ink: #ededea;
-    --muted: #93969c;
-    --rule: #2a2c31;
+    --paper: #141219;
+    --ink: #eceae6;
+    --muted: #948f9d;
+    --rule: #2b2833;
     --pos: #3fa898;
     --neg: #c77399;
 
-    --paper-raised: #191b1f;
-    --paper-sunken: #0d0e11;
+    --paper-raised: #1c1922;
+    --paper-sunken: #100e15;
     --focus: var(--ink);
+    --grain-opacity: 0.05;
   }
 }
 
 :root[data-theme='dark'] {
-  --paper: #121316;
-  --ink: #ededea;
-  --muted: #93969c;
-  --rule: #2a2c31;
+  --paper: #141219;
+  --ink: #eceae6;
+  --muted: #948f9d;
+  --rule: #2b2833;
   --pos: #3fa898;
   --neg: #c77399;
 
-  --paper-raised: #191b1f;
-  --paper-sunken: #0d0e11;
+  --paper-raised: #1c1922;
+  --paper-sunken: #100e15;
   --focus: var(--ink);
+  --grain-opacity: 0.05;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -36,9 +36,27 @@ body {
   font-synthesis-weight: none;
 }
 
-/* Hairlines are a structural device here, so they get one definition. */
-.rule {
-  border-color: var(--rule);
+/**
+ * Grain.
+ *
+ * One fixed layer of fractal noise over the whole page. It is the difference
+ * between a surface and a fill: without it both themes read as flat swatches,
+ * which is what makes a minimal interface look unfinished rather than quiet.
+ * Sits above the background, below everything else, and never takes a click.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
 }
 
 :focus-visible {
@@ -49,4 +67,74 @@ body {
 
 ::selection {
   background: var(--pos-wash);
+}
+
+/**
+ * The ruler.
+ *
+ * The signature device: a number line, drawn as one. It marks the top of a
+ * section the way a scale marks a measurement, and it recurs rather than
+ * appearing once, which is what makes it read as this product's own mark.
+ */
+.ruler-ticks {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--rule) 0 1px,
+    transparent 1px 12px
+  );
+  mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 12%,
+    black 88%,
+    transparent
+  );
+}
+
+/**
+ * A bar draws itself in.
+ *
+ * Only the `from` state is declared, so the resting value is whatever the
+ * element's own style says. No fill mode, no delay: if animation frames never
+ * arrive the bar is simply already at its correct length, rather than stuck at
+ * zero with the data invisible.
+ */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.grow-x {
+  animation: grow-x var(--grow-duration, 620ms) var(--ease-out);
+  transform-origin: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grow-x {
+    animation: none;
+  }
+}
+
+/* Content arrives rather than being already there. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 420ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
 }

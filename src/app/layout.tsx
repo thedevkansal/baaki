@@ -5,7 +5,7 @@ import {
   IBM_Plex_Mono,
   Schibsted_Grotesk,
 } from 'next/font/google'
-import { THEME_INIT_SCRIPT } from '@/components/ui/theme-toggle'
+import { SiteHeader } from '@/components/site-header'
 import './globals.css'
 
 /** Display face. Balance figures and screen titles only - never body copy. */
@@ -53,8 +53,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f6f3' },
-    { media: '(prefers-color-scheme: dark)', color: '#121316' },
+    { media: '(prefers-color-scheme: light)', color: '#f7f5f0' },
+    { media: '(prefers-color-scheme: dark)', color: '#141219' },
   ],
 }
 
@@ -64,12 +64,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       lang="en"
       className={`${bricolage.variable} ${schibsted.variable} ${plexMono.variable} ${anek.variable} h-full antialiased`}
     >
-      <head>
-        {/* Sets the stored theme before first paint, so a dark-mode reader
-            never gets flashed a white page on the way in. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   )
 }
