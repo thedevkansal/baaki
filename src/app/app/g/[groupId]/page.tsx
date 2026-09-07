@@ -217,7 +217,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" onClick={() => setShareOpen(true)}>
-            {group.shared ? 'Shared' : 'Share'}
+            Invite
           </Button>
           <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
             Add expense
@@ -662,6 +662,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               meId={myId}
               nameOf={ledger.nameOf}
               groupId={groupId}
+            group={group}
               onSettle={
                 pair && pair.amount.minor < 0n
                   ? () => {

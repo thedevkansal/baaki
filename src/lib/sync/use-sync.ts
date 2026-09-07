@@ -8,7 +8,13 @@ import {
   type SyncEvent,
 } from '../store/store'
 import { payloadFor } from './payload'
-import { pullGroup, removeExpense, removeSettlement, shareGroup } from './actions'
+import {
+  pullGroup,
+  removeExpense,
+  removeParticipant,
+  removeSettlement,
+  shareGroup,
+} from './actions'
 
 /** How often a visible shared group checks for other people's changes. */
 const POLL_MS = 20_000
@@ -95,6 +101,8 @@ export function useSyncHandler() {
             await removeExpense(event.groupId, event.id)
           } else if (event.kind === 'settlement-deleted') {
             await removeSettlement(event.groupId, event.id)
+          } else if (event.kind === 'person-removed') {
+            await removeParticipant(event.groupId, event.id)
           } else {
             await pushGroup(event.groupId)
           }

@@ -7,8 +7,8 @@ import { Sheet } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { money, type Money } from '@/lib/money'
-import { removePersonFromGroup, renamePerson } from '@/lib/store/store'
-import type { Expense, Person } from '@/lib/store/types'
+import { removePersonFromGroup, renamePerson, setPersonVpa } from '@/lib/store/store'
+import type { Expense, Group, Person } from '@/lib/store/types'
 
 /**
  * One person, and only what you have in common with them.
@@ -29,6 +29,7 @@ export function PersonSheet({
   nameOf,
   onSettle,
   groupId,
+  group,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -43,10 +44,27 @@ export function PersonSheet({
   meId: string
   nameOf: (personId: string) => string
   onSettle?: () => void
+  /** Needed to know what this device is allowed to change about them. */
+  group: Group
   groupId: string
 }) {
   const [name, setName] = useState(person.name)
   const [removeError, setRemoveError] = useState<string | null>(null)
+
+  /**
+   * What this device may change about this person.
+   *
+   * Your own name and UPI ID are yours. Everyone else's are theirs, the moment
+   * they have a phone of their own in the group: nobody else can spell their
+   * name for them, and a VPA typed by somebody else sends money to a stranger.
+   * Until they turn up their name is a placeholder the owner can still fix.
+   * Removing anybody is the owner's alone.
+   */
+  const unclaimed = group.shared ? !(group.claimed ?? []).includes(person.id) : true
+  const isOwner = group.shared ? group.owner === true : true
+  const canRename = isMe || (isOwner && unclaimed)
+  const canEditVpa = isMe
+  const canRemove = isOwner
   const shared = expenses.filter(
     (expense) =>
       expense.shares.some((s) => s.personId === person.id && BigInt(s.minor) !== 0n) ||
@@ -186,50 +204,83 @@ export function PersonSheet({
           </ul>
         </div>
 
-        <div className="rounded-xl border border-rule px-4 py-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-            Name
-          </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              className={inputClass}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              aria-label={`Name for ${person.name}`}
-            />
-            <Button
-              size="sm"
-              disabled={!name.trim() || name.trim() === person.name}
-              onClick={() => renamePerson(person.id, name)}
-            >
-              Save
-            </Button>
-          </div>
-
-          {!isMe && (
-            <>
-              <p className="mt-4 text-xs leading-relaxed text-muted">
-                {shared.length === 0
-                  ? 'Added by mistake? They can be taken out while they are not on anything.'
-                  : 'They are on bills here, so removing them would leave a balance owed to nobody.'}
-              </p>
+        {(canRename || canEditVpa) && (
+          <div className="rounded-xl border border-rule px-4 py-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+              {isMe ? 'You' : 'Name'}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <input
+                className={inputClass}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                aria-label={`Name for ${person.name}`}
+              />
               <Button
                 size="sm"
-                variant="danger"
-                className="mt-3"
-                disabled={shared.length > 0}
-                onClick={() => {
-                  const result = removePersonFromGroup(groupId, person.id)
-                  if (result.removed) onOpenChange(false)
-                  else setRemoveError(result.reason ?? null)
-                }}
+                disabled={!name.trim() || name.trim() === person.name}
+                onClick={() => renamePerson(person.id, name)}
               >
-                Remove from group
+                Save
               </Button>
-              {removeError && <p className="mt-2 text-xs text-neg">{removeError}</p>}
-            </>
-          )}
-        </div>
+            </div>
+
+            {canEditVpa && (
+              <input
+                className={`${inputClass} mt-3`}
+                value={person.vpa ?? ''}
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="Your UPI ID"
+                aria-label="Your UPI ID"
+                onChange={(event) => setPersonVpa(person.id, event.target.value)}
+              />
+            )}
+
+            {!isMe && canRename && (
+              <p className="mt-3 text-xs leading-relaxed text-muted">
+                A placeholder until they open the invite. Once they do, their name and
+                UPI ID are theirs to set.
+              </p>
+            )}
+          </div>
+        )}
+
+        {!isMe && !canRename && shared.length === 0 && (
+          <p className="px-1 text-xs leading-relaxed text-muted">
+            {group.shared
+              ? 'They set their own name and UPI ID from their phone.'
+              : 'Only they can change their name and UPI ID once they join.'}
+          </p>
+        )}
+
+        {!isMe && canRemove && (
+          <div className="rounded-xl border border-rule px-4 py-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+              Remove
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              {shared.length === 0
+                ? 'Added by mistake? They can be taken out while they are not on anything.'
+                : 'They are on bills here, so removing them would leave a balance owed to nobody.'}
+            </p>
+            <Button
+              size="sm"
+              variant="danger"
+              className="mt-3"
+              disabled={shared.length > 0}
+              onClick={() => {
+                const result = removePersonFromGroup(groupId, person.id)
+                if (result.removed) onOpenChange(false)
+                else setRemoveError(result.reason ?? null)
+              }}
+            >
+              Remove from group
+            </Button>
+            {removeError && <p className="mt-2 text-xs text-neg">{removeError}</p>}
+          </div>
+        )}
       </div>
     </Sheet>
   )

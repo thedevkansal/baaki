@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { getState, markShared } from '@/lib/store/store'
@@ -53,33 +53,55 @@ export function ShareSheet({
     setPeople(result.people ?? null)
   }
 
+  /**
+   * A group that is already shared has a link already. Making somebody press
+   * "show" for a thing that exists is friction with nothing on the other side
+   * of it, so it is fetched as the sheet opens. Nothing is written to state
+   * before the request comes back, so opening the sheet does not re-render it.
+   */
+  useEffect(() => {
+    if (!open || !group.shared || invite) return
+    let live = true
+
+    void (async () => {
+      const state = getState()
+      const payload = payloadFor(state, group.id)
+      if (!payload) return
+      const result = await shareGroup(payload, group.meId ?? state.meId)
+      if (!live) return
+      if (!result.ok || !result.inviteUrl) {
+        setError(result.message ?? 'The link could not be fetched.')
+        return
+      }
+      setInvite(result.inviteUrl)
+      setPeople(result.people ?? null)
+    })()
+
+    return () => {
+      live = false
+    }
+  }, [open, group, invite])
+
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title="Share this group"
+      title="Invite to this group"
       description={
         group.shared
-          ? 'Everyone here has their own copy. Balances stay in step across all of them.'
+          ? 'Everyone here keeps their own copy, and balances stay in step across all of them.'
           : 'One link for everyone. Whoever opens it says who they are and gives their own UPI ID.'
-      }
-      footer={
-        <Button variant="primary" className="w-full" onClick={() => onOpenChange(false)}>
-          Done
-        </Button>
       }
     >
       <div className="space-y-6">
         {!group.shared && (
           <Button variant="primary" className="w-full" disabled={busy} onClick={share}>
-            {busy ? 'Sharing…' : 'Share this group'}
+            {busy ? 'Making the link…' : 'Create an invite link'}
           </Button>
         )}
 
-        {group.shared && !invite && (
-          <Button className="w-full" disabled={busy} onClick={share}>
-            {busy ? 'Loading…' : 'Show the link'}
-          </Button>
+        {group.shared && !invite && !error && (
+          <p className="text-sm text-muted">Fetching the link…</p>
         )}
 
         {error && <p className="text-sm text-neg">{error}</p>}

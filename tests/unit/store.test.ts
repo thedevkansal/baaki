@@ -22,6 +22,8 @@ globalThis.localStorage = new MemoryStorage() as unknown as Storage
 const {
   addDueOccurrences,
   applyPulledGroup,
+  setPersonVpa,
+  setSyncHandler,
   addExpense,
   addPerson,
   createGroup,
@@ -289,6 +291,48 @@ describe('the sample trip', () => {
     expect(getState().expenses.filter((e) => e.groupId === group.id)).toHaveLength(5)
     // Somebody has to be owed something, or there is nothing to demonstrate.
     expect([...balancesFor(group.id).values()].some((m) => m.minor !== 0n)).toBe(true)
+  })
+})
+
+describe('what reaches the server', () => {
+  /** Everything the sync layer would have been told about. */
+  function recordEvents() {
+    const seen: { kind: string; groupId: string }[] = []
+    setSyncHandler((event) => seen.push({ kind: event.kind, groupId: event.groupId }))
+    return seen
+  }
+
+  it('pushes a rename and a UPI change, not only bills', () => {
+    const me = getState().meId
+    const priya = addPerson('Priya').id
+    const group = createGroup('Flat', INR, [me, priya])
+    // Shared, the way a pull leaves it.
+    applyPulledGroup({
+      group: { ...group, shared: {} },
+      people: [
+        { id: me, name: 'You' },
+        { id: priya, name: 'Priya' },
+      ],
+      expenses: [],
+      settlements: [],
+    })
+
+    const seen = recordEvents()
+    renamePerson(me, 'Dev')
+    setPersonVpa(me, 'dev@okaxis')
+    equalBill(group.id, 'Wifi', me, '1000', [me, priya])
+
+    setSyncHandler(null)
+    expect(seen.filter((e) => e.groupId === group.id)).toHaveLength(3)
+  })
+
+  it('says nothing about a group that is not shared', () => {
+    const me = getState().meId
+    const group = createGroup('Flat', INR, [me])
+    const seen = recordEvents()
+    renamePerson(me, 'Dev')
+    setSyncHandler(null)
+    expect(seen).toHaveLength(0)
   })
 })
 

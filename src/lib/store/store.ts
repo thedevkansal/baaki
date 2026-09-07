@@ -80,6 +80,7 @@ export type SyncEvent =
   | { kind: 'changed'; groupId: string }
   | { kind: 'expense-deleted'; groupId: string; id: string }
   | { kind: 'settlement-deleted'; groupId: string; id: string }
+  | { kind: 'person-removed'; groupId: string; id: string }
 
 let syncHandler: ((event: SyncEvent) => void) | null = null
 
@@ -90,6 +91,19 @@ export function setSyncHandler(fn: ((event: SyncEvent) => void) | null) {
 function synced(event: SyncEvent) {
   const group = load().groups.find((g) => g.id === event.groupId)
   if (group?.shared) syncHandler?.(event)
+}
+
+/**
+ * A person is not owned by one group, so a change to their name or UPI ID has
+ * to reach every shared group they are in. Missing this is why renaming
+ * yourself on your own phone never left the device.
+ */
+function syncedPerson(personId: string) {
+  for (const group of load().groups) {
+    if (group.shared && group.memberIds.includes(personId)) {
+      synced({ kind: 'changed', groupId: group.id })
+    }
+  }
 }
 
 export function subscribe(fn: () => void) {
@@ -127,6 +141,7 @@ export function setMyName(name: string) {
       p.id === current.meId ? { ...p, name: name.trim() || 'You' } : p,
     ),
   })
+  syncedPerson(current.meId)
 }
 
 export function setPersonVpa(personId: string, vpa: string) {
@@ -137,6 +152,7 @@ export function setPersonVpa(personId: string, vpa: string) {
       p.id === personId ? { ...p, vpa: vpa.trim() || undefined } : p,
     ),
   })
+  syncedPerson(personId)
 }
 
 export function addPerson(name: string, groupId?: string): Person {
@@ -149,6 +165,7 @@ export function addPerson(name: string, groupId?: string): Person {
     )
   }
   commit(next)
+  if (groupId) synced({ kind: 'changed', groupId })
   return person
 }
 
@@ -190,6 +207,7 @@ export function removePersonFromGroup(
         : g,
     ),
   })
+  synced({ kind: 'person-removed', groupId, id: personId })
   return { removed: true }
 }
 
@@ -202,6 +220,7 @@ export function renamePerson(personId: string, name: string) {
     ...current,
     people: current.people.map((p) => (p.id === personId ? { ...p, name: trimmed } : p)),
   })
+  syncedPerson(personId)
 }
 
 export function createGroup(name: string, currency: string, memberIds: string[]): Group {
@@ -224,6 +243,7 @@ export function updateGroup(groupId: string, patch: Partial<Omit<Group, 'id'>>) 
     ...current,
     groups: current.groups.map((g) => (g.id === groupId ? { ...g, ...patch } : g)),
   })
+  synced({ kind: 'changed', groupId })
 }
 
 export function deleteGroup(groupId: string) {

@@ -125,6 +125,18 @@ export async function shareGroup(
       if (!row) throw new Error('the group could not be created')
       const serverGroupId = row.id
 
+      /**
+       * A push may add people. It may not rewrite the ones already there.
+       *
+       * Everybody in a shared group pushes the whole group, so an unrestricted
+       * upsert means the last person to add a bill silently overwrites
+       * everyone's names and UPI IDs with whatever their own copy last saw.
+       * A wrong VPA is money sent to a stranger, so this is not a merge
+       * conflict to be resolved later, it is a thing that must not happen.
+       *
+       * Editing an existing row is done below, once, and only for rows this
+       * device is allowed to touch.
+       */
       for (const person of payload.people) {
         await tx
           .insert(participants)
@@ -134,14 +146,52 @@ export async function shareGroup(
             displayName: person.name,
             vpa: person.vpa ?? null,
             // The sharing device takes its own seat on the spot; everybody
-            // else claims one through the group's invite link.
+            // else arrives through the group's invite link.
             ...(person.id === meLocalId ? { claimedAt: new Date(), deviceId: me } : {}),
           })
-          .onConflictDoUpdate({
-            target: [participants.groupId, participants.localId],
-            // A claim already made is never overwritten by a later push.
-            set: { displayName: person.name, vpa: person.vpa ?? null },
-          })
+          .onConflictDoNothing()
+      }
+
+      const mine = payload.people.find((person) => person.id === meLocalId)
+      if (mine) {
+        // Your own name and UPI ID, which are yours alone to set.
+        await tx
+          .update(participants)
+          .set({ displayName: mine.name, vpa: mine.vpa ?? null })
+          .where(
+            and(
+              eq(participants.groupId, serverGroupId),
+              eq(participants.localId, meLocalId),
+              eq(participants.deviceId, me),
+            ),
+          )
+      }
+
+      /**
+       * The owner may still fix a name nobody has claimed: "p1" was a
+       * placeholder for a person who has not turned up, and correcting it to
+       * "Priya" before she does is the point of listing people at all.
+       */
+      const [owner] = await tx
+        .select({ deviceId: groups.ownerDeviceId })
+        .from(groups)
+        .where(eq(groups.id, serverGroupId))
+        .limit(1)
+
+      if (owner?.deviceId === me) {
+        for (const person of payload.people) {
+          if (person.id === meLocalId) continue
+          await tx
+            .update(participants)
+            .set({ displayName: person.name })
+            .where(
+              and(
+                eq(participants.groupId, serverGroupId),
+                eq(participants.localId, person.id),
+                isNull(participants.claimedAt),
+              ),
+            )
+        }
       }
 
       const rows = await tx
@@ -405,7 +455,7 @@ export async function joinGroup(
   }
 
   const seat = await seatOf(db, group.id, me)
-  const payload = await readGroup(db, group.id)
+  const payload = await readGroup(db, group.id, me)
   if (!payload || !seat) return { ok: false, message: 'That group could not be read.' }
   return { ok: true, payload, meId: seat.localId }
 }
@@ -430,13 +480,17 @@ export async function pullGroup(localGroupId: string): Promise<PullResult> {
     .where(and(eq(participants.groupId, group.id), eq(participants.deviceId, me)))
     .limit(1)
 
-  const payload = await readGroup(db, group.id)
+  const payload = await readGroup(db, group.id, me)
   if (!payload) return { ok: false, message: 'That group could not be read.' }
   return { ok: true, payload, meId: seat?.localId }
 }
 
 /** Read a whole group back out, in the shape the device stores it in. */
-async function readGroup(db: Db, serverGroupId: string): Promise<GroupPayload | null> {
+async function readGroup(
+  db: Db,
+  serverGroupId: string,
+  device?: string,
+): Promise<GroupPayload | null> {
   const [group] = await db.select().from(groups).where(eq(groups.id, serverGroupId)).limit(1)
   if (!group) return null
 
@@ -470,6 +524,8 @@ async function readGroup(db: Db, serverGroupId: string): Promise<GroupPayload | 
       simplify: group.simplify,
       memberIds: seats.map((s) => s.localId),
       createdAt: group.createdAt.toISOString(),
+      owner: device !== undefined && group.ownerDeviceId === device,
+      claimed: seats.filter((s) => s.claimedAt).map((s) => s.localId),
     },
     people: seats.map((s) => ({
       id: s.localId,
@@ -645,4 +701,52 @@ export async function reproposeSettlement(
     .set({ status: 'proposed', confirmedAt: null })
     .where(eq(settlements.id, row.id))
   return { ok: true }
+}
+
+/**
+ * Take somebody out of a shared group.
+ *
+ * The group's owner only. Everybody pushes the whole group, so without this
+ * any member could quietly drop any other member, and the person who would
+ * find out last is the one who was removed.
+ */
+export async function removeParticipant(
+  localGroupId: string,
+  personLocalId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
+
+  const db = getDb()
+  const me = await deviceId()
+
+  const [group] = await db
+    .select({ id: groups.id, ownerDeviceId: groups.ownerDeviceId })
+    .from(groups)
+    .where(eq(groups.localId, localGroupId))
+    .limit(1)
+  if (!group) return { ok: false, message: 'That group is not shared.' }
+  if (group.ownerDeviceId !== me) {
+    return { ok: false, message: 'Only whoever set the group up can remove someone.' }
+  }
+
+  const seat = await seatOf(db, group.id, me)
+  if (seat?.localId === personLocalId) {
+    return { ok: false, message: 'You cannot remove yourself from your own group.' }
+  }
+
+  /**
+   * The foreign keys from expense rows are ON DELETE RESTRICT, so somebody who
+   * is on a bill cannot be deleted and Postgres says so. That is the invariant
+   * doing its job: removing them would leave a balance owed to nobody.
+   */
+  try {
+    await db
+      .delete(participants)
+      .where(
+        and(eq(participants.groupId, group.id), eq(participants.localId, personLocalId)),
+      )
+    return { ok: true }
+  } catch {
+    return { ok: false, message: 'They are on a bill in this group, so they have to stay.' }
+  }
 }
