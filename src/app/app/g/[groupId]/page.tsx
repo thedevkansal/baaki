@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AddExpenseSheet } from '@/components/app/add-expense-sheet'
 import { GroupCharts } from '@/components/app/group-charts'
 import { GroupSettingsSheet } from '@/components/app/group-settings-sheet'
+import { PersonSheet } from '@/components/app/person-sheet'
 import { SettleSheet } from '@/components/app/settle-sheet'
 import { BalanceBeam } from '@/components/beam/balance-beam'
 import { Button } from '@/components/ui/button'
@@ -41,6 +42,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
 
   const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
 
@@ -338,30 +340,37 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               {ledger.balances.map(({ person, net }, index) => (
                 <li
                   key={person.id}
-                  className="rise flex items-center gap-3 rounded-xl border border-rule px-4 py-3 transition-colors hover:border-ink"
+                  className="rise"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <Avatar name={person.name} />
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="min-w-0 truncate text-sm">{person.name}</span>
-                    {person.id === state.meId && (
-                      <span className="shrink-0 rounded-full border border-rule px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-                        you
-                      </span>
-                    )}
-                  </span>
-                  <span
-                    className={cn(
-                      'shrink-0 font-mono text-sm tabular-nums',
-                      net.minor < 0n
-                        ? 'text-neg'
-                        : net.minor > 0n
-                          ? 'text-pos'
-                          : 'text-muted',
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => setViewing(person.id)}
+                    aria-label={`${person.name}, ${formatMoney(net)}`}
+                    className="flex w-full items-center gap-3 rounded-xl border border-rule px-4 py-3 text-left transition-colors hover:border-ink"
                   >
-                    {formatMoney(net)}
-                  </span>
+                    <Avatar name={person.name} />
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="min-w-0 truncate text-sm">{person.name}</span>
+                      {person.id === state.meId && (
+                        <span className="shrink-0 rounded-full border border-rule px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                          you
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        'shrink-0 font-mono text-sm tabular-nums',
+                        net.minor < 0n
+                          ? 'text-neg'
+                          : net.minor > 0n
+                            ? 'text-pos'
+                            : 'text-muted',
+                      )}
+                    >
+                      {formatMoney(net)}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -508,6 +517,39 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           <GroupCharts expenses={expenses} members={members} currency={currency} />
         )}
       </div>
+
+      {viewing &&
+        (() => {
+          const person = ledger.personOf(viewing)
+          if (!person) return null
+          const entry = ledger.balances.find((b) => b.person.id === viewing)
+          const pair = yourSplit.find((p) => p.person.id === viewing)
+          return (
+            <PersonSheet
+              open
+              onOpenChange={(next) => !next && setViewing(null)}
+              person={person}
+              isMe={person.id === state.meId}
+              net={entry?.net ?? money(0n, currency)}
+              yourPosition={pair?.amount}
+              expenses={expenses}
+              currency={currency}
+              meId={state.meId}
+              nameOf={ledger.nameOf}
+              onSettle={
+                pair && pair.amount.minor < 0n
+                  ? () => {
+                      setViewing(null)
+                      setSettling({
+                        to: person,
+                        amount: money(-pair.amount.minor, currency),
+                      })
+                    }
+                  : undefined
+              }
+            />
+          )
+        })()}
 
       {settingsOpen && (
         <GroupSettingsSheet
