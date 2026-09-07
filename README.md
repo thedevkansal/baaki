@@ -54,9 +54,16 @@ npm run dev
 Nothing needs configuring to run it. For the database layer:
 
 ```bash
-cp .env.example .env.local   # fill in DATABASE_URL
+cp .env.example .env.local   # fill in the two Postgres URLs
 npm run db:migrate
 ```
+
+Supabase wants two connection strings, not one. The runtime uses the
+transaction pooler on 6543, which hands back a different backend between
+statements; migrations need the session pooler on 5432, because DDL, advisory
+locks and this schema's deferred trigger all need one backend to stay put. New
+projects have no IPv4 direct host at all, so `db.<ref>.supabase.co` will not
+resolve.
 
 ```bash
 npm test          # unit, property and database tests
