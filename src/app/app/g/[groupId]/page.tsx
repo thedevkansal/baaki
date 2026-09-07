@@ -204,6 +204,12 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           }
         />
 
+        {yourSplit.length > 0 && (
+          <p className="mt-4 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+            your position with each person
+          </p>
+        )}
+
         {focusedPerson && (
           <p className="mt-6 rounded-xl bg-paper px-4 py-3 text-sm">
             {focusedPerson.amount.minor < 0n
@@ -343,6 +349,9 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
       <div className="mt-6">
         {tab === 'balances' && (
           <>
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+              everyone&rsquo;s standing with the whole group
+            </p>
             <ul className="space-y-2">
               {ledger.balances.map(({ person, net }, index) => (
                 <li
