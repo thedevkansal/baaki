@@ -115,26 +115,33 @@ export function Hero() {
        * what answers the question.
        */}
       <div className="mx-auto flex min-h-[calc(100svh-4.5rem)] w-full max-w-6xl flex-col justify-center px-6 py-16">
-        {/**
-         * The question, at the size it deserves: it is the product's whole
-         * pitch, so it gets the screen. The trick is giving it the width to set
-         * on one line rather than shrinking it. It used to sit in a 1024px
-         * column at 165px, which needs about 1320px, so it wrapped and left
-         * "hai?" orphaned. Every other section on this page is already 6xl.
-         */}
-        <h1 className="font-display text-[clamp(2.75rem,9.5vw,8.5rem)] font-semibold leading-[0.88] tracking-[-0.045em]">
-          kitna <span className="text-pos">baaki</span> hai
-          <span className="text-neg">?</span>
-        </h1>
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
+          Bill splitting, without the paywall
+        </p>
 
         {/**
-         * The positioning line used to sit above the headline as a tracked-out
-         * label, which is the third such label on this screen. It says more as
-         * a sentence, and the screen is quieter for having one fewer.
+         * The break after "baaki" is written, not left to the column width.
+         *
+         * The two lines are the composition: the question stacks, and "hai?"
+         * lands under it with the mark of the question set apart. Letting it
+         * wrap on its own made that break a function of the window, which is
+         * how it ended up on one line at some sizes and orphaned at others.
          */}
-        <p className="mt-7 max-w-[54ch] text-lg leading-relaxed text-muted sm:text-xl">
+        {/**
+         * Pulled left by its own side bearing so the stem of the "k" lands on
+         * the same line as everything else, rather than the glyph's invisible
+         * box doing. At 152px that bearing is 10px, which is plainly visible
+         * against a label with none. In em so it holds at every size.
+         */}
+        <h1 className="mt-6 -ml-[0.066em] font-display text-[clamp(3rem,11.5vw,9.5rem)] font-semibold leading-[0.86] tracking-[-0.045em]">
+          kitna <span className="text-pos">baaki</span>
+          <br />
+          hai<span className="text-neg">?</span>
+        </h1>
+
+        <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
           The question every group chat ends with. Baaki answers it the moment a bill
-          lands and settles it over UPI in one tap, with nothing behind a paywall.
+          lands, and settles it over UPI in one tap.
         </p>
 
         <p
