@@ -464,6 +464,21 @@ export function applyPulledGroup(payload: {
   const current = load()
   const groupId = payload.group.id
 
+  /**
+   * A pull never empties a group.
+   *
+   * The server is authoritative, but "the server returned nothing" is far more
+   * often a bug on our side than a group somebody actually cleared: a bad id,
+   * a half written row, a request that resolved against the wrong thing. This
+   * exact shape once wiped a real ledger, so an empty answer about a group
+   * that has bills locally is now refused rather than believed. Emptying a
+   * group is what deleting it is for.
+   */
+  const localBills = current.expenses.filter((e) => e.groupId === groupId).length
+  if (localBills > 0 && payload.expenses.length === 0 && payload.people.length === 0) {
+    return
+  }
+
   const peopleById = new Map(current.people.map((p) => [p.id, p]))
   for (const person of payload.people) {
     peopleById.set(person.id, { ...peopleById.get(person.id), ...person })

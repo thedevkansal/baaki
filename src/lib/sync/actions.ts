@@ -97,7 +97,13 @@ export async function shareGroup(
 
   try {
     const seats = await db.transaction(async (tx) => {
-      await tx
+      /**
+       * One statement, with a real conflict target. This was
+       * `onConflictDoNothing()` with none, which cannot conflict, so every
+       * share inserted a second empty copy of the group and a later pull could
+       * pick the empty one and report the group as having nothing in it.
+       */
+      const [row] = await tx
         .insert(groups)
         .values({
           localId: group.id,
@@ -106,20 +112,15 @@ export async function shareGroup(
           simplify: group.simplify,
           ownerDeviceId: me,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: groups.localId,
+          // ownerDeviceId is never reassigned: whoever shared it stays owner.
+          set: { name: group.name, currency: group.currency, simplify: group.simplify },
+        })
+        .returning({ id: groups.id })
 
-      const [existing] = await tx
-        .select({ id: groups.id })
-        .from(groups)
-        .where(eq(groups.localId, group.id))
-        .limit(1)
-      if (!existing) throw new Error('the group could not be created')
-      const serverGroupId = existing.id
-
-      await tx
-        .update(groups)
-        .set({ name: group.name, currency: group.currency, simplify: group.simplify })
-        .where(eq(groups.id, serverGroupId))
+      if (!row) throw new Error('the group could not be created')
+      const serverGroupId = row.id
 
       for (const person of payload.people) {
         await tx

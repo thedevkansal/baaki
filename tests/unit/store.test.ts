@@ -21,6 +21,7 @@ globalThis.localStorage = new MemoryStorage() as unknown as Storage
 
 const {
   addDueOccurrences,
+  applyPulledGroup,
   addExpense,
   addPerson,
   createGroup,
@@ -288,6 +289,48 @@ describe('the sample trip', () => {
     expect(getState().expenses.filter((e) => e.groupId === group.id)).toHaveLength(5)
     // Somebody has to be owed something, or there is nothing to demonstrate.
     expect([...balancesFor(group.id).values()].some((m) => m.minor !== 0n)).toBe(true)
+  })
+})
+
+describe('pulling a shared group', () => {
+  it('refuses an empty answer about a group that has bills', () => {
+    const me = getState().meId
+    const priya = addPerson('Priya').id
+    const group = createGroup('Goa trip', INR, [me, priya])
+    equalBill(group.id, 'Beach house', priya, '9000', [me, priya])
+
+    // What a pull looked like when it resolved against the wrong row.
+    applyPulledGroup({
+      group: { ...group, memberIds: [] },
+      people: [],
+      expenses: [],
+      settlements: [],
+    })
+
+    expect(getState().expenses).toHaveLength(1)
+    expect(getState().groups[0].memberIds).toEqual([me, priya])
+    expect(netOf(group.id, me)).toBe(-450000n)
+  })
+
+  it('still applies a real change from the server', () => {
+    const me = getState().meId
+    const priya = addPerson('Priya').id
+    const group = createGroup('Goa trip', INR, [me, priya])
+    equalBill(group.id, 'Beach house', priya, '9000', [me, priya])
+
+    applyPulledGroup({
+      group: { ...group, name: 'Goa trip 2026' },
+      people: [
+        { id: me, name: 'You' },
+        { id: priya, name: 'Priya' },
+      ],
+      expenses: [],
+      settlements: [],
+    })
+
+    // People arrived, so this is an answer about a group somebody emptied.
+    expect(getState().groups[0].name).toBe('Goa trip 2026')
+    expect(getState().expenses).toHaveLength(0)
   })
 })
 

@@ -43,6 +43,13 @@
       "when": 1788778606440,
       "tag": "0005_woozy_living_lightning",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788780086338,
+      "tag": "0006_needy_tinkerer",
+      "breakpoints": true
     }
   ]
 }

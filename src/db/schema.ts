@@ -74,7 +74,9 @@ export const paymentIds = pgTable(
   (table) => [index('payment_ids_user_idx').on(table.userId)],
 )
 
-export const groups = pgTable('groups', {
+export const groups = pgTable(
+  'groups',
+  {
   id: id(),
   localId: localId(),
   name: text('name').notNull(),
@@ -89,7 +91,16 @@ export const groups = pgTable('groups', {
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
   createdAt: createdAt(),
-})
+  },
+  /**
+   * One row per group, ever. Without this the upsert in the sync push has no
+   * conflict target, so it never conflicts and quietly inserts a second, empty
+   * copy of the group on every share. A later pull then picks the empty twin
+   * and reports the group as having no people and no bills, which the client
+   * believes.
+   */
+  (table) => [uniqueIndex('groups_local_key').on(table.localId)],
+)
 
 /**
  * Everyone who can appear in a split, whether or not they have an account.
