@@ -27,6 +27,8 @@ const {
   deleteExpense,
   getState,
   proposeSettlement,
+  removePersonFromGroup,
+  renamePerson,
   resetEverything,
   seedSampleGroup,
   setSettlementStatus,
@@ -235,6 +237,47 @@ describe('repeats', () => {
 
   it('does nothing for a series that no longer exists', () => {
     expect(addDueOccurrences('gone', ['2026-07-01'])).toBe(0)
+  })
+})
+
+describe('people in a group', () => {
+  it('removes somebody added by mistake', () => {
+    const me = getState().meId
+    const typo = addPerson('Priyaa').id
+    const group = createGroup('Flat', INR, [me, typo])
+
+    expect(removePersonFromGroup(group.id, typo)).toEqual({ removed: true })
+    expect(getState().groups[0].memberIds).toEqual([me])
+  })
+
+  it('refuses once they are on a bill, rather than orphaning a balance', () => {
+    const me = getState().meId
+    const priya = addPerson('Priya').id
+    const group = createGroup('Flat', INR, [me, priya])
+    equalBill(group.id, 'Wifi', me, '1000', [me, priya])
+
+    const result = removePersonFromGroup(group.id, priya)
+    expect(result.removed).toBe(false)
+    expect(result.reason).toMatch(/on a bill/)
+    expect(getState().groups[0].memberIds).toContain(priya)
+  })
+
+  it('refuses to remove you from your own group', () => {
+    const me = getState().meId
+    const group = createGroup('Flat', INR, [me])
+    expect(removePersonFromGroup(group.id, me).removed).toBe(false)
+  })
+
+  it('renames without touching any history', () => {
+    const me = getState().meId
+    const priya = addPerson('Priya').id
+    const group = createGroup('Flat', INR, [me, priya])
+    equalBill(group.id, 'Wifi', me, '1000', [me, priya])
+
+    renamePerson(priya, 'Priya S')
+    expect(getState().people.find((p) => p.id === priya)?.name).toBe('Priya S')
+    expect(netOf(group.id, me)).toBe(50000n)
+    expect(sumsToZero(group.id)).toBe(0n)
   })
 })
 

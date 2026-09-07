@@ -1,11 +1,13 @@
 'use client'
 
-import { Avatar } from '@/components/ui/field'
+import { useState } from 'react'
+import { Avatar, inputClass } from '@/components/ui/field'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { money, type Money } from '@/lib/money'
+import { removePersonFromGroup, renamePerson } from '@/lib/store/store'
 import type { Expense, Person } from '@/lib/store/types'
 
 /**
@@ -26,6 +28,7 @@ export function PersonSheet({
   meId,
   nameOf,
   onSettle,
+  groupId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -40,7 +43,10 @@ export function PersonSheet({
   meId: string
   nameOf: (personId: string) => string
   onSettle?: () => void
+  groupId: string
 }) {
+  const [name, setName] = useState(person.name)
+  const [removeError, setRemoveError] = useState<string | null>(null)
   const shared = expenses.filter(
     (expense) =>
       expense.shares.some((s) => s.personId === person.id && BigInt(s.minor) !== 0n) ||
@@ -178,6 +184,51 @@ export function PersonSheet({
               </li>
             )}
           </ul>
+        </div>
+
+        <div className="rounded-xl border border-rule px-4 py-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+            Name
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              aria-label={`Name for ${person.name}`}
+            />
+            <Button
+              size="sm"
+              disabled={!name.trim() || name.trim() === person.name}
+              onClick={() => renamePerson(person.id, name)}
+            >
+              Save
+            </Button>
+          </div>
+
+          {!isMe && (
+            <>
+              <p className="mt-4 text-xs leading-relaxed text-muted">
+                {shared.length === 0
+                  ? 'Added by mistake? They can be taken out while they are not on anything.'
+                  : 'They are on bills here, so removing them would leave a balance owed to nobody.'}
+              </p>
+              <Button
+                size="sm"
+                variant="danger"
+                className="mt-3"
+                disabled={shared.length > 0}
+                onClick={() => {
+                  const result = removePersonFromGroup(groupId, person.id)
+                  if (result.removed) onOpenChange(false)
+                  else setRemoveError(result.reason ?? null)
+                }}
+              >
+                Remove from group
+              </Button>
+              {removeError && <p className="mt-2 text-xs text-neg">{removeError}</p>}
+            </>
+          )}
         </div>
       </div>
     </Sheet>

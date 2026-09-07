@@ -552,6 +552,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               currency={currency}
               meId={state.meId}
               nameOf={ledger.nameOf}
+              groupId={groupId}
               onSettle={
                 pair && pair.amount.minor < 0n
                   ? () => {

@@ -128,6 +128,58 @@ export function addPerson(name: string, groupId?: string): Person {
   return person
 }
 
+/**
+ * Take somebody out of a group.
+ *
+ * Refused once they appear on a bill or a payment: removing them then would
+ * either delete history or leave a balance owed to nobody. Names can be fixed
+ * by renaming instead, which is why this is only for the ones added by mistake.
+ */
+export function removePersonFromGroup(
+  groupId: string,
+  personId: string,
+): { removed: boolean; reason?: string } {
+  const current = load()
+  const involved =
+    current.expenses.some(
+      (e) =>
+        e.groupId === groupId &&
+        (e.payers.some((p) => p.personId === personId) ||
+          e.shares.some((s) => s.personId === personId && BigInt(s.minor) !== 0n)),
+    ) ||
+    current.settlements.some(
+      (s) => s.groupId === groupId && (s.fromId === personId || s.toId === personId),
+    )
+
+  if (involved) {
+    return { removed: false, reason: 'They are on a bill or a payment in this group.' }
+  }
+  if (personId === current.meId) {
+    return { removed: false, reason: 'You cannot remove yourself from your own group.' }
+  }
+
+  commit({
+    ...current,
+    groups: current.groups.map((g) =>
+      g.id === groupId
+        ? { ...g, memberIds: g.memberIds.filter((id) => id !== personId) }
+        : g,
+    ),
+  })
+  return { removed: true }
+}
+
+/** Rename anybody, including yourself. */
+export function renamePerson(personId: string, name: string) {
+  const current = load()
+  const trimmed = name.trim()
+  if (!trimmed) return
+  commit({
+    ...current,
+    people: current.people.map((p) => (p.id === personId ? { ...p, name: trimmed } : p)),
+  })
+}
+
 export function createGroup(name: string, currency: string, memberIds: string[]): Group {
   const current = load()
   const group: Group = {
