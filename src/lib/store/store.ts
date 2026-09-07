@@ -68,6 +68,30 @@ function commit(next: AppState) {
   listeners.forEach((fn) => fn())
 }
 
+
+/**
+ * What a shared group does after a local write.
+ *
+ * The store stays synchronous and offline-first; anything to do with the
+ * network is registered from outside and is free to fail. A write always lands
+ * locally first, so a push that never happens costs a sync, not the data.
+ */
+export type SyncEvent =
+  | { kind: 'changed'; groupId: string }
+  | { kind: 'expense-deleted'; groupId: string; id: string }
+  | { kind: 'settlement-deleted'; groupId: string; id: string }
+
+let syncHandler: ((event: SyncEvent) => void) | null = null
+
+export function setSyncHandler(fn: ((event: SyncEvent) => void) | null) {
+  syncHandler = fn
+}
+
+function synced(event: SyncEvent) {
+  const group = load().groups.find((g) => g.id === event.groupId)
+  if (group?.shared) syncHandler?.(event)
+}
+
 export function subscribe(fn: () => void) {
   listeners.add(fn)
   return () => {
@@ -248,6 +272,7 @@ export function addExpense(draft: ExpenseDraft): Expense {
     createdAt: new Date().toISOString(),
   }
   commit({ ...current, expenses: [expense, ...current.expenses] })
+  synced({ kind: 'changed', groupId: draft.groupId })
   return expense
 }
 
@@ -284,11 +309,16 @@ export function updateExpense(expenseId: string, draft: ExpenseDraft) {
         : expense,
     ),
   })
+  synced({ kind: 'changed', groupId: draft.groupId })
 }
 
 export function deleteExpense(expenseId: string) {
   const current = load()
+  const doomed = current.expenses.find((e) => e.id === expenseId)
   commit({ ...current, expenses: current.expenses.filter((e) => e.id !== expenseId) })
+  if (doomed) {
+    synced({ kind: 'expense-deleted', groupId: doomed.groupId, id: expenseId })
+  }
 }
 
 export function proposeSettlement(input: {
@@ -310,25 +340,32 @@ export function proposeSettlement(input: {
     createdAt: new Date().toISOString(),
   }
   commit({ ...current, settlements: [settlement, ...current.settlements] })
+  synced({ kind: 'changed', groupId: input.groupId })
   return settlement
 }
 
 export function setSettlementStatus(settlementId: string, status: Settlement['status']) {
   const current = load()
+  const target = current.settlements.find((s) => s.id === settlementId)
   commit({
     ...current,
     settlements: current.settlements.map((s) =>
       s.id === settlementId ? { ...s, status } : s,
     ),
   })
+  if (target) synced({ kind: 'changed', groupId: target.groupId })
 }
 
 export function deleteSettlement(settlementId: string) {
   const current = load()
+  const doomed = current.settlements.find((s) => s.id === settlementId)
   commit({
     ...current,
     settlements: current.settlements.filter((s) => s.id !== settlementId),
   })
+  if (doomed) {
+    synced({ kind: 'settlement-deleted', groupId: doomed.groupId, id: settlementId })
+  }
 }
 
 /**

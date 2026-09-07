@@ -80,6 +80,12 @@ export const groups = pgTable('groups', {
   name: text('name').notNull(),
   currency: char('currency', { length: 3 }).notNull().default('INR'),
   simplify: boolean('simplify').notNull().default(true),
+  /**
+   * The device that first shared this group. Re-issuing somebody's join link
+   * releases their seat, so it has to be one person's call rather than any
+   * member's, or Rahul could reset your seat and take it.
+   */
+  ownerDeviceId: text('owner_device_id'),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
   createdAt: createdAt(),
@@ -222,6 +228,7 @@ export const settlements = pgTable(
       .notNull()
       .default('proposed'),
     localId: localId(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     initiatedBy: uuid('initiated_by').references(() => users.id, { onDelete: 'set null' }),
     confirmedBy: uuid('confirmed_by').references(() => users.id, { onDelete: 'set null' }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),

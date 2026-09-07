@@ -29,6 +29,20 @@
       "when": 1788761219792,
       "tag": "0003_colossal_quasar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788778467401,
+      "tag": "0004_soft_oracle",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788778606440,
+      "tag": "0005_woozy_living_lightning",
+      "breakpoints": true
     }
   ]
 }

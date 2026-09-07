@@ -7,6 +7,7 @@ import { GroupCharts } from '@/components/app/group-charts'
 import { GroupSettingsSheet } from '@/components/app/group-settings-sheet'
 import { PersonSheet } from '@/components/app/person-sheet'
 import { SettleSheet } from '@/components/app/settle-sheet'
+import { ShareSheet } from '@/components/app/share-sheet'
 import { BalanceBeam } from '@/components/beam/balance-beam'
 import { Button } from '@/components/ui/button'
 import { Avatar, Field, SegmentedControl, inputClass } from '@/components/ui/field'
@@ -23,6 +24,8 @@ import {
   setSettlementStatus,
 } from '@/lib/store/store'
 import { personIdOf, useAppState, useGroupLedger } from '@/lib/store/use-store'
+import { useGroupSync, useSyncHandler } from '@/lib/sync/use-sync'
+import { answerSettlement } from '@/lib/sync/actions'
 import type { Person } from '@/lib/store/types'
 
 type Tab = 'balances' | 'activity' | 'charts'
@@ -41,10 +44,16 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [focused, setFocused] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [answerError, setAnswerError] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
 
   const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
+
+  // Above the not-found return: hooks run in the same order on every render.
+  useSyncHandler()
+  useGroupSync(groupId, Boolean(group?.shared))
 
   if (!group) {
     return (
@@ -62,6 +71,25 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
 
   const currency = group.currency
   const pending = settlements.filter((s) => s.status === 'proposed')
+
+  /**
+   * Answer a payment someone says they made to you.
+   *
+   * On a shared group the server decides, because it is the only party that can
+   * tell who is actually asking. The local write only happens once it has said
+   * yes, so a refused answer never shows as an accepted one.
+   */
+  const answer = async (id: string, verdict: 'confirmed' | 'disputed') => {
+    setAnswerError(null)
+    if (group?.shared) {
+      const result = await answerSettlement(groupId, id, verdict)
+      if (!result.ok) {
+        setAnswerError(result.message ?? 'That could not be recorded.')
+        return
+      }
+    }
+    setSettlementStatus(id, verdict)
+  }
   const focusedPerson = yourSplit.find((s) => s.person.id === focused)
 
   /**
@@ -158,29 +186,33 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               aria-label="Group settings"
               className="shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-paper-sunken hover:text-ink"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="3"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18 6l-1.4 1.4M7.4 16.6 6 18M18 18l-1.4-1.4M7.4 7.4 6 6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
+{/* Sliders. The old glyph was a circle with rays, which is a sun. */}
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <path d="M4 7h5M13 7h7M4 12h11M19 12h1M4 17h3M11 17h9" />
+                <circle cx="11" cy="7" r="2" />
+                <circle cx="17" cy="12" r="2" />
+                <circle cx="9" cy="17" r="2" />
               </svg>
             </button>
           </div>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
-          Add expense
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button size="sm" onClick={() => setShareOpen(true)}>
+            {group.shared ? 'Shared' : 'Share'}
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
+            Add expense
+          </Button>
+        </div>
       </div>
 
       <div className="mt-8 rounded-2xl border border-rule bg-paper-raised px-6 py-9">
@@ -318,33 +350,58 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   )}
                 </span>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => deleteSettlement(s.id)}>
-                    {iPaid ? 'Undo' : 'Not yet'}
-                  </Button>
                   {/**
-                   * Only the payee gets the confirm button. Anyone else gets a
-                   * quieter one that says whose word it is being recorded on,
-                   * because pressing somebody's confirmation for them is the
-                   * exact thing the two-sided settle is supposed to prevent.
+                   * Confirming is the payee's alone. In a shared group nobody
+                   * else is offered it at all, and the server refuses it even if
+                   * the request is forged, because confirming is the act that
+                   * moves a balance.
+                   *
+                   * A group still on one device is the exception: there is no
+                   * other phone to press it, so this device records what it was
+                   * told, and says that is what it is doing.
                    */}
-                  <Button
-                    size="sm"
-                    variant={paidMe ? 'primary' : 'secondary'}
-                    onClick={() => setSettlementStatus(s.id, 'confirmed')}
-                  >
-                    {paidMe ? 'Confirm' : `${ledger.nameOf(s.toId)} told me`}
-                  </Button>
+                  {paidMe ? (
+                    <>
+                      <Button size="sm" onClick={() => answer(s.id, 'disputed')}>
+                        Not yet
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => answer(s.id, 'confirmed')}
+                      >
+                        Confirm
+                      </Button>
+                    </>
+                  ) : iPaid ? (
+                    <Button size="sm" onClick={() => deleteSettlement(s.id)}>
+                      Undo
+                    </Button>
+                  ) : !group.shared ? (
+                    <Button
+                      size="sm"
+                      onClick={() => setSettlementStatus(s.id, 'confirmed')}
+                    >
+                      {ledger.nameOf(s.toId)} told me
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             )
           })}
-          {pending.some((s) => s.toId !== state.meId) && (
+          {!group.shared && pending.some((s) => s.toId !== state.meId) && (
             <li className="px-1 text-xs leading-relaxed text-muted">
-              This device keeps the book for the whole group, so a payment to
-              someone else can only move once you record that they said it
-              landed. When they have their own copy of the group, only they can.
+              This group is only on this device, so a payment between two other
+              people moves when you record that it did. Share the group and each
+              person answers for themselves.
             </li>
           )}
+          {group.shared && pending.some((s) => s.fromId === state.meId) && (
+            <li className="px-1 text-xs leading-relaxed text-muted">
+              Nothing moves until they confirm it on their own phone.
+            </li>
+          )}
+          {answerError && <li className="px-1 text-xs text-neg">{answerError}</li>}
         </ul>
       )}
 
@@ -580,6 +637,10 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
             />
           )
         })()}
+
+      {shareOpen && (
+        <ShareSheet open onOpenChange={setShareOpen} group={group} />
+      )}
 
       {settingsOpen && (
         <GroupSettingsSheet

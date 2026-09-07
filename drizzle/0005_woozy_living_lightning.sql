@@ -1,0 +1,1 @@
+ALTER TABLE "groups" ADD COLUMN "owner_device_id" text;

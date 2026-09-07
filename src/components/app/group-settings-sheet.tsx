@@ -6,11 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Field, inputClass } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { buildGroupCsv, csvFilename, describeExport } from '@/lib/export'
-import { deleteGroup, getState, markShared, updateGroup } from '@/lib/store/store'
-import { useAppState } from '@/lib/store/use-store'
+import { deleteGroup, updateGroup } from '@/lib/store/store'
 import type { Expense, Group, Person, Settlement } from '@/lib/store/types'
-import { payloadFor, type JoinLink } from '@/lib/sync/payload'
-import { shareGroup } from '@/lib/sync/actions'
 
 export function GroupSettingsSheet({
   open,
@@ -34,11 +31,6 @@ export function GroupSettingsSheet({
   const router = useRouter()
   const [name, setName] = useState(group.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [links, setLinks] = useState<JoinLink[] | null>(null)
-  const [sharing, setSharing] = useState(false)
-  const [shareError, setShareError] = useState<string | null>(null)
-  const [copied, setCopied] = useState<string | null>(null)
-  const myId = useAppState().meId
 
   const confirmedSettlements = settlements.filter((s) => s.status === 'confirmed').length
 
@@ -122,95 +114,6 @@ export function GroupSettingsSheet({
               />
             </span>
           </button>
-        </div>
-
-        <div className="rounded-xl border border-rule px-4 py-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-            Share this group
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
-            {group.shared
-              ? 'Everyone below has a link. One link, one person, used once.'
-              : 'Put the group on the server and get a link for each person. They open theirs and that phone becomes them, with no account and nothing to install.'}
-          </p>
-
-          <Button
-            size="sm"
-            variant={group.shared ? 'secondary' : 'primary'}
-            className="mt-4"
-            disabled={sharing}
-            onClick={async () => {
-              setSharing(true)
-              setShareError(null)
-              const state = getState()
-              const payload = payloadFor(state, group.id)
-              if (!payload) {
-                setShareError('That group could not be read.')
-                setSharing(false)
-                return
-              }
-              const result = await shareGroup(payload, state.meId)
-              setSharing(false)
-              if (!result.ok || !result.links) {
-                setShareError(result.message ?? 'The group could not be shared.')
-                return
-              }
-              markShared(group.id)
-              setLinks(result.links)
-            }}
-          >
-            {sharing
-              ? 'Sharing…'
-              : group.shared
-                ? 'Get the links again'
-                : 'Share this group'}
-          </Button>
-
-          {shareError && <p className="mt-3 text-sm text-neg">{shareError}</p>}
-
-          {links && (
-            <ul className="mt-4 space-y-2">
-              {links.map((link) => (
-                <li
-                  key={link.personId}
-                  className="flex items-center gap-3 rounded-lg border border-rule px-3 py-2"
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {link.name}
-                    {link.personId === myId && (
-                      <span className="ml-2 font-mono text-[11px] text-muted">you</span>
-                    )}
-                  </span>
-                  {link.personId === myId ? (
-                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-                      this device
-                    </span>
-                  ) : link.claimed ? (
-                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-pos">
-                      joined
-                    </span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(link.url)
-                        setCopied(link.personId)
-                      }}
-                    >
-                      {copied === link.personId ? 'Copied' : 'Copy link'}
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {links && (
-            <p className="mt-3 text-xs leading-relaxed text-muted">
-              A link is the whole of a person’s identity until accounts exist, so send
-              each one to that person and nobody else. Once it is used it stops working.
-            </p>
-          )}
         </div>
 
         <div className="rounded-xl border border-rule px-4 py-4">

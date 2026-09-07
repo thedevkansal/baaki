@@ -2,7 +2,7 @@
 
 import { randomBytes, randomUUID } from 'node:crypto'
 import { cookies, headers } from 'next/headers'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { getDb, isDatabaseConfigured } from '@/db/client'
 import {
   expensePayers,
@@ -104,6 +104,7 @@ export async function shareGroup(
           name: group.name,
           currency: group.currency,
           simplify: group.simplify,
+          ownerDeviceId: me,
         })
         .onConflictDoNothing()
 
@@ -171,12 +172,17 @@ export async function shareGroup(
           })
           .onConflictDoUpdate({
             target: [expenses.groupId, expenses.localId],
+            /**
+             * deletedAt is deliberately not cleared. A device that has not
+             * pulled since somebody deleted a bill still has it locally, and
+             * clearing the tombstone on push would resurrect it on everyone's
+             * phone. Deletes travel as their own operation.
+             */
             set: {
               description: expense.description,
               category: expense.category,
               occurredOn: expense.occurredOn,
               splitMode: expense.splitMode,
-              deletedAt: null,
             },
           })
           .returning({ id: expenses.id })
@@ -225,7 +231,18 @@ export async function shareGroup(
           })
           .onConflictDoUpdate({
             target: [settlements.groupId, settlements.localId],
-            set: { status: s.status, amountMinor: BigInt(s.minor) },
+            /**
+             * Only a proposal can still change. Once the payee has confirmed or
+             * disputed, that is the answer, and a push from a device that has
+             * not pulled since must not undo it. This is the one race in the
+             * sync loop that would move money, so it is closed in SQL rather
+             * than by hoping the client pulls first.
+             */
+            set: {
+              amountMinor: BigInt(s.minor),
+              status: sql`case when ${settlements.status} = 'proposed'
+                          then excluded.status else ${settlements.status} end`,
+            },
           })
       }
 
@@ -367,9 +384,14 @@ export async function claimSeat(token: string): Promise<PullResult> {
   }
 
   if (!seat.claimedAt) {
+    /**
+     * The token is destroyed, not just marked used. A link is a bearer secret,
+     * and the seat is bound to the device from here on, so keeping the secret
+     * around only leaves something to leak out of a chat history later.
+     */
     await db
       .update(participants)
-      .set({ claimedAt: new Date(), deviceId: me })
+      .set({ claimedAt: new Date(), deviceId: me, claimToken: null })
       .where(eq(participants.id, seat.id))
   }
 
@@ -428,7 +450,7 @@ async function readGroup(db: Db, serverGroupId: string): Promise<GroupPayload | 
   const paid = await db
     .select()
     .from(settlements)
-    .where(eq(settlements.groupId, serverGroupId))
+    .where(and(eq(settlements.groupId, serverGroupId), isNull(settlements.deletedAt)))
 
   return {
     group: {
@@ -476,4 +498,133 @@ async function readGroup(db: Db, serverGroupId: string): Promise<GroupPayload | 
       createdAt: s.createdAt.toISOString(),
     })),
   }
+}
+
+/** The seat this device holds in a group, or null if it holds none. */
+async function seatOf(db: Db, serverGroupId: string, device: string) {
+  const [seat] = await db
+    .select({ id: participants.id, localId: participants.localId })
+    .from(participants)
+    .where(and(eq(participants.groupId, serverGroupId), eq(participants.deviceId, device)))
+    .limit(1)
+  return seat ?? null
+}
+
+async function serverGroup(db: Db, localGroupId: string) {
+  const [group] = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.localId, localGroupId))
+    .limit(1)
+  return group ?? null
+}
+
+/** Mark a bill deleted for everyone. Tombstoned, never removed, so a peer that has not pulled cannot bring it back. */
+export async function removeExpense(localGroupId: string, expenseLocalId: string) {
+  if (!isDatabaseConfigured()) return { ok: false as const }
+  const db = getDb()
+  const group = await serverGroup(db, localGroupId)
+  if (!group) return { ok: false as const }
+
+  await db
+    .update(expenses)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(expenses.groupId, group.id), eq(expenses.localId, expenseLocalId)))
+  return { ok: true as const }
+}
+
+/** Withdraw a payment somebody said they made. Same tombstone rule. */
+export async function removeSettlement(localGroupId: string, settlementLocalId: string) {
+  if (!isDatabaseConfigured()) return { ok: false as const }
+  const db = getDb()
+  const group = await serverGroup(db, localGroupId)
+  if (!group) return { ok: false as const }
+
+  await db
+    .update(settlements)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(settlements.groupId, group.id), eq(settlements.localId, settlementLocalId)))
+  return { ok: true as const }
+}
+
+/**
+ * Answer a payment somebody says they made to you.
+ *
+ * The server checks who is asking rather than trusting the client to only
+ * offer the button to the right person. Confirming a payment is the act that
+ * moves a balance, so it is the one place where "this device is that seat" has
+ * to be proven on the server or it means nothing.
+ */
+export async function answerSettlement(
+  localGroupId: string,
+  settlementLocalId: string,
+  answer: 'confirmed' | 'disputed',
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
+
+  const db = getDb()
+  const me = await deviceId()
+  const group = await serverGroup(db, localGroupId)
+  if (!group) return { ok: false, message: 'That group is not shared.' }
+
+  const seat = await seatOf(db, group.id, me)
+  if (!seat) return { ok: false, message: 'This device is not in that group.' }
+
+  const [row] = await db
+    .select({ id: settlements.id, toParticipantId: settlements.toParticipantId, status: settlements.status })
+    .from(settlements)
+    .where(and(eq(settlements.groupId, group.id), eq(settlements.localId, settlementLocalId)))
+    .limit(1)
+
+  if (!row) return { ok: false, message: 'That payment is not on the server yet.' }
+  if (row.toParticipantId !== seat.id) {
+    return { ok: false, message: 'Only the person who was paid can answer this.' }
+  }
+  if (row.status !== 'proposed') {
+    return { ok: false, message: 'That payment has already been answered.' }
+  }
+
+  await db
+    .update(settlements)
+    .set({ status: answer, confirmedAt: new Date() })
+    .where(eq(settlements.id, row.id))
+  return { ok: true }
+}
+
+/**
+ * Issue a fresh join link for somebody, releasing whatever device held it.
+ *
+ * The lost-phone case. Only the device that shared the group may do this: a
+ * seat is somebody's identity in the ledger, so letting any member reset any
+ * seat would let one member take another's place.
+ */
+export async function reissueLink(
+  localGroupId: string,
+  personLocalId: string,
+): Promise<{ ok: boolean; message?: string; url?: string }> {
+  if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
+
+  const db = getDb()
+  const me = await deviceId()
+  const base = await origin()
+
+  const [group] = await db
+    .select({ id: groups.id, ownerDeviceId: groups.ownerDeviceId })
+    .from(groups)
+    .where(eq(groups.localId, localGroupId))
+    .limit(1)
+  if (!group) return { ok: false, message: 'That group is not shared.' }
+  if (group.ownerDeviceId !== me) {
+    return { ok: false, message: 'Only the device that shared this group can send a new link.' }
+  }
+
+  const token = newToken()
+  const changed = await db
+    .update(participants)
+    .set({ claimToken: token, claimedAt: null, deviceId: null })
+    .where(and(eq(participants.groupId, group.id), eq(participants.localId, personLocalId)))
+    .returning({ id: participants.id })
+
+  if (changed.length === 0) return { ok: false, message: 'That person is not in the group.' }
+  return { ok: true, url: `${base}/join/${token}` }
 }
