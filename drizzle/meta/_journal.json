@@ -15,6 +15,20 @@
       "when": 1788737691031,
       "tag": "0001_money_conservation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788760620722,
+      "tag": "0002_furry_ghost_rider",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788761219792,
+      "tag": "0003_colossal_quasar",
+      "breakpoints": true
     }
   ]
 }

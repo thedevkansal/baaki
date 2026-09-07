@@ -22,6 +22,15 @@ export interface Group {
   memberIds: string[]
   createdAt: string
   simplify: boolean
+  /**
+   * Set once the group has been pushed to the server and join links exist.
+   * Absent means the group lives only on this device, which is the default and
+   * needs no account to work.
+   */
+  shared?: {
+    /** When this device last pulled the server copy. */
+    lastPulledAt?: string
+  }
 }
 
 export interface Allocation {

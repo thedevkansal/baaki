@@ -409,6 +409,63 @@ export function importGroup(input: {
  * currency: enough that the balances, the charts and the settle flow all have
  * something to show without anyone having to type for five minutes first.
  */
+/**
+ * Replace this device's copy of one group with the server's.
+ *
+ * The server is authoritative for a shared group, so this is a replace rather
+ * than a merge: anything local that the server does not have for this group is
+ * dropped. Nothing outside the group is touched, and people are merged by id
+ * rather than replaced, so somebody who is also in a local-only group keeps
+ * their name there.
+ */
+export function applyPulledGroup(payload: {
+  group: Group
+  people: Person[]
+  expenses: Expense[]
+  settlements: Settlement[]
+}, meId?: string) {
+  const current = load()
+  const groupId = payload.group.id
+
+  const peopleById = new Map(current.people.map((p) => [p.id, p]))
+  for (const person of payload.people) {
+    peopleById.set(person.id, { ...peopleById.get(person.id), ...person })
+  }
+
+  const others = current.groups.filter((g) => g.id !== groupId)
+  const pulled: Group = {
+    ...payload.group,
+    shared: { lastPulledAt: new Date().toISOString() },
+  }
+
+  commit({
+    ...current,
+    // A device that has claimed a seat *is* that person from then on.
+    meId: meId ?? current.meId,
+    people: [...peopleById.values()],
+    groups: [...others, pulled],
+    expenses: [
+      ...current.expenses.filter((e) => e.groupId !== groupId),
+      ...payload.expenses,
+    ],
+    settlements: [
+      ...current.settlements.filter((s) => s.groupId !== groupId),
+      ...payload.settlements,
+    ],
+  })
+}
+
+/** Note that a group now lives on the server too. */
+export function markShared(groupId: string) {
+  const current = load()
+  commit({
+    ...current,
+    groups: current.groups.map((g) =>
+      g.id === groupId ? { ...g, shared: { lastPulledAt: new Date().toISOString() } } : g,
+    ),
+  })
+}
+
 export function seedSampleGroup(): Group {
   const current = load()
   const priya = { id: newId('p'), name: 'Priya' }

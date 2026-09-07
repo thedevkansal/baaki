@@ -24,6 +24,21 @@ import {
 const minor = (name: string) => bigint(name, { mode: 'bigint' })
 
 const id = () => uuid('id').primaryKey().defaultRandom()
+
+/**
+ * The id this row already had on the device that created it.
+ *
+ * Rows are made offline first and only later pushed, so the client cannot be
+ * handed a server id at creation time. Syncing on the id the client already
+ * chose keeps a push idempotent without a mapping table on either side.
+ */
+const localId = () =>
+  text('local_id')
+    .notNull()
+    // Defaulted in the database, not just in Drizzle: psql, the MCP server and
+    // the tests all write here too, and a not-null column with no default is a
+    // trap for every writer that is not this ORM.
+    .default(sql`gen_random_uuid()::text`)
 const createdAt = () =>
   timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 
@@ -61,6 +76,7 @@ export const paymentIds = pgTable(
 
 export const groups = pgTable('groups', {
   id: id(),
+  localId: localId(),
   name: text('name').notNull(),
   currency: char('currency', { length: 3 }).notNull().default('INR'),
   simplify: boolean('simplify').notNull().default(true),
@@ -86,11 +102,27 @@ export const participants = pgTable(
       .references(() => groups.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     displayName: text('display_name').notNull(),
+    vpa: text('vpa'),
+    localId: localId(),
+    /**
+     * The secret in this person's join link. One token per seat rather than one
+     * per group, so a link says who you are as well as which group, and so a
+     * leaked link costs exactly one seat.
+     */
+    claimToken: text('claim_token').unique(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    /**
+     * The device that claimed the seat. No accounts yet, so this is the whole
+     * of identity: a random id the browser keeps in a cookie. Being able to say
+     * "somebody already claimed this" is the point.
+     */
+    deviceId: text('device_id'),
     leftAt: timestamp('left_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
   (table) => [
     index('participants_group_idx').on(table.groupId),
+    uniqueIndex('participants_group_local_key').on(table.groupId, table.localId),
     // One seat per account per group. Ghosts are unconstrained, since they
     // have no identity to collide on.
     uniqueIndex('participants_group_user_key')
@@ -119,11 +151,15 @@ export const expenses = pgTable(
     originalMinor: minor('original_minor'),
     /** The rate used, captured at entry and never re-applied afterwards. */
     originalRate: text('original_rate'),
+    localId: localId(),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (table) => [index('expenses_group_idx').on(table.groupId, table.occurredOn)],
+  (table) => [
+    index('expenses_group_idx').on(table.groupId, table.occurredOn),
+    uniqueIndex('expenses_group_local_key').on(table.groupId, table.localId),
+  ],
 )
 
 /** Who actually put money down. More than one person can. */
@@ -185,12 +221,16 @@ export const settlements = pgTable(
     status: text('status', { enum: ['proposed', 'confirmed', 'disputed'] })
       .notNull()
       .default('proposed'),
+    localId: localId(),
     initiatedBy: uuid('initiated_by').references(() => users.id, { onDelete: 'set null' }),
     confirmedBy: uuid('confirmed_by').references(() => users.id, { onDelete: 'set null' }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (table) => [index('settlements_group_idx').on(table.groupId, table.status)],
+  (table) => [
+    index('settlements_group_idx').on(table.groupId, table.status),
+    uniqueIndex('settlements_group_local_key').on(table.groupId, table.localId),
+  ],
 )
 
 export const groupsRelations = relations(groups, ({ many }) => ({
