@@ -23,16 +23,15 @@ import {
   deleteSettlement,
   setSettlementStatus,
 } from '@/lib/store/store'
-import { personIdOf, useAppState, useGroupLedger } from '@/lib/store/use-store'
+import { personIdOf, useGroupLedger } from '@/lib/store/use-store'
 import { useGroupSync, useSyncHandler } from '@/lib/sync/use-sync'
-import { answerSettlement } from '@/lib/sync/actions'
+import { answerSettlement, reproposeSettlement } from '@/lib/sync/actions'
 import type { Person } from '@/lib/store/types'
 
 type Tab = 'balances' | 'activity' | 'charts'
 
 export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const { groupId } = use(params)
-  const state = useAppState()
   const ledger = useGroupLedger(groupId)
 
   const [tab, setTab] = useState<Tab>('balances')
@@ -49,7 +48,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const [editing, setEditing] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
 
-  const { group, members, me, expenses, settlements, yourNet, yourSplit } = ledger
+  const { group, members, me, myId, expenses, settlements, yourNet, yourSplit } = ledger
 
   // Above the not-found return: hooks run in the same order on every render.
   useSyncHandler()
@@ -71,6 +70,14 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
 
   const currency = group.currency
   const pending = settlements.filter((s) => s.status === 'proposed')
+  /**
+   * Payments the payee said did not arrive.
+   *
+   * "Not yet" has to come back to the person who said they paid, or it is a
+   * dead end: the balance never moved, and the only person who can do anything
+   * about it never finds out.
+   */
+  const disputed = settlements.filter((s) => s.status === 'disputed' && s.fromId === myId)
 
   /**
    * Answer a payment someone says they made to you.
@@ -79,10 +86,13 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
    * tell who is actually asking. The local write only happens once it has said
    * yes, so a refused answer never shows as an accepted one.
    */
-  const answer = async (id: string, verdict: 'confirmed' | 'disputed') => {
+  const answer = async (id: string, verdict: 'confirmed' | 'disputed' | 'proposed') => {
     setAnswerError(null)
     if (group?.shared) {
-      const result = await answerSettlement(groupId, id, verdict)
+      const result =
+        verdict === 'proposed'
+          ? await reproposeSettlement(groupId, id)
+          : await answerSettlement(groupId, id, verdict)
       if (!result.ok) {
         setAnswerError(result.message ?? 'That could not be recorded.')
         return
@@ -164,7 +174,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
 
   const myTransfers = ledger.transfers
     .map((t, index) => ({ t, index }))
-    .filter(({ t }) => personIdOf(t.from) === state.meId)
+    .filter(({ t }) => personIdOf(t.from) === myId)
 
   return (
     <>
@@ -319,11 +329,40 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         </ul>
       )}
 
+      {disputed.length > 0 && (
+        <ul className="mt-6 space-y-2">
+          {disputed.map((s) => (
+            <li
+              key={s.id}
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-neg bg-neg-wash px-4 py-3"
+            >
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="font-medium">{ledger.nameOf(s.toId)}</span> says the{' '}
+                {formatMoney(money(BigInt(s.minor), currency))} has not arrived. Nothing
+                moved.
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => deleteSettlement(s.id)}>
+                  Clear it
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => answer(s.id, 'proposed')}
+                >
+                  Ask again
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {pending.length > 0 && (
         <ul className="mt-6 space-y-2">
           {pending.map((s) => {
-            const iPaid = s.fromId === state.meId
-            const paidMe = s.toId === state.meId
+            const iPaid = s.fromId === myId
+            const paidMe = s.toId === myId
             const amount = formatMoney(money(BigInt(s.minor), currency))
             return (
               <li
@@ -389,14 +428,14 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               </li>
             )
           })}
-          {!group.shared && pending.some((s) => s.toId !== state.meId) && (
+          {!group.shared && pending.some((s) => s.toId !== myId) && (
             <li className="px-1 text-xs leading-relaxed text-muted">
               This group is only on this device, so a payment between two other
               people moves when you record that it did. Share the group and each
               person answers for themselves.
             </li>
           )}
-          {group.shared && pending.some((s) => s.fromId === state.meId) && (
+          {group.shared && pending.some((s) => s.fromId === myId) && (
             <li className="px-1 text-xs leading-relaxed text-muted">
               Nothing moves until they confirm it on their own phone.
             </li>
@@ -438,7 +477,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                     <Avatar name={person.name} />
                     <span className="flex min-w-0 flex-1 items-center gap-2">
                       <span className="min-w-0 truncate text-sm">{person.name}</span>
-                      {person.id === state.meId && (
+                      {person.id === myId && (
                         <span className="shrink-0 rounded-full border border-rule px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
                           you
                         </span>
@@ -480,7 +519,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               {visibleActivity.map((item, index) => {
                 if (item.kind === 'settlement') {
                   const { settlement } = item
-                  const iPaid = settlement.fromId === state.meId
+                  const iPaid = settlement.fromId === myId
                   return (
                     <li
                       key={settlement.id}
@@ -492,7 +531,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                           {iPaid
                             ? `You paid ${ledger.nameOf(settlement.toId)}`
                             : `${ledger.nameOf(settlement.fromId)} paid ${
-                                settlement.toId === state.meId
+                                settlement.toId === myId
                                   ? 'you'
                                   : ledger.nameOf(settlement.toId)
                               }`}
@@ -531,7 +570,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   .map((p) => ledger.nameOf(p.personId))
                   .join(', ')
                 const yourShare =
-                  expense.shares.find((s) => s.personId === state.meId)?.minor ?? '0'
+                  expense.shares.find((s) => s.personId === myId)?.minor ?? '0'
                 return (
                   <li
                     key={expense.id}
@@ -615,12 +654,12 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               open
               onOpenChange={(next) => !next && setViewing(null)}
               person={person}
-              isMe={person.id === state.meId}
+              isMe={person.id === myId}
               net={entry?.net ?? money(0n, currency)}
               yourPosition={pair?.amount}
               expenses={expenses}
               currency={currency}
-              meId={state.meId}
+              meId={myId}
               nameOf={ledger.nameOf}
               groupId={groupId}
               onSettle={

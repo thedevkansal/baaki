@@ -31,6 +31,15 @@ export interface Group {
     /** When this device last pulled the server copy. */
     lastPulledAt?: string
   }
+  /**
+   * Who this device is in this group.
+   *
+   * Per group, not per device: you are "Dev" in the flat and whatever you
+   * called yourself when you joined somebody's trip, and joining the trip must
+   * not rewrite who you are in the flat. Falls back to the device's own person
+   * for groups made here.
+   */
+  meId?: string
 }
 
 export interface Allocation {

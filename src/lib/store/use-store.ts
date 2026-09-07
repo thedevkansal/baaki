@@ -39,6 +39,8 @@ export interface GroupLedger {
   /** Your position with each other member, signed from your side. */
   yourSplit: { person: Person; amount: Money }[]
   yourNet: Money
+  /** The id of the person this device is, in this group. */
+  myId: string
   transfers: Transfer[]
   provenance: Provenance[]
   /** How many payments the group would take without simplification. */
@@ -113,7 +115,9 @@ export function useGroupLedger(groupId: string): GroupLedger {
       .map((person) => ({ person, net: net.get(refOf(person.id)) ?? zero(currency) }))
       .sort((a, b) => (b.net.minor > a.net.minor ? 1 : b.net.minor < a.net.minor ? -1 : 0))
 
-    const meRef = refOf(state.meId)
+    // Who you are here, which is not necessarily who you are anywhere else.
+    const myId = group?.meId ?? state.meId
+    const meRef = refOf(myId)
     const yourSplit = edges
       .filter((e) => e.from === meRef || e.to === meRef)
       .map((e) => {
@@ -129,7 +133,8 @@ export function useGroupLedger(groupId: string): GroupLedger {
     return {
       group,
       members,
-      me: byId.get(state.meId),
+      me: byId.get(myId),
+      myId,
       expenses,
       settlements,
       balances,
@@ -180,13 +185,14 @@ export function useGroupSummaries() {
         }))
 
       const net = netBalances(entries, settlementEntries, group.currency)
+      const myId = group.meId ?? state.meId
       return {
         group,
         members: group.memberIds
           .map((id) => byId.get(id))
           .filter((p): p is Person => Boolean(p)),
         expenseCount: entries.length,
-        yourNet: net.get(refOf(state.meId)) ?? zero(group.currency),
+        yourNet: net.get(refOf(myId)) ?? zero(group.currency),
       }
     })
   }, [state])

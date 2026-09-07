@@ -11,7 +11,13 @@ import { Sheet } from '@/components/ui/sheet'
 import { formatMoney } from '@/lib/format'
 import { add, zero } from '@/lib/money'
 import { SUPPORTED_CURRENCIES } from '@/lib/fx'
-import { addPerson, createGroup, seedSampleGroup, setMyName } from '@/lib/store/store'
+import {
+  addPerson,
+  createGroup,
+  seedSampleGroup,
+  setMyName,
+  setPersonVpa,
+} from '@/lib/store/store'
 import { useAppState, useGroupSummaries } from '@/lib/store/use-store'
 
 export default function GroupsPage() {
@@ -23,13 +29,19 @@ export default function GroupsPage() {
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('INR')
   const [others, setOthers] = useState('')
+  const [myName, setMyNameField] = useState('')
   const [importing, setImporting] = useState(false)
 
   const me = state.people.find((p) => p.id === state.meId)
+  // "You" is the placeholder a fresh device starts with, not a name somebody
+  // chose. Anything that puts a name in front of other people asks for a real
+  // one first.
+  const unnamed = !me?.name || me.name === 'You'
   const overall = summaries.reduce((acc, s) => add(acc, s.yourNet), zero('INR'))
   const sameCurrency = summaries.every((s) => s.group.currency === 'INR')
 
   const submit = () => {
+    if (myName.trim()) setMyName(myName.trim())
     const names = others
       .split(',')
       .map((n) => n.trim())
@@ -137,21 +149,33 @@ export default function GroupsPage() {
 
       <section className="mt-12 rounded-2xl border border-rule px-5 py-5">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-          This device
+          You
         </p>
         <div className="mt-4 flex items-center gap-3">
           <Avatar name={me?.name ?? 'You'} />
           <input
             className={inputClass}
-            value={me?.name ?? ''}
+            value={unnamed ? '' : (me?.name ?? '')}
             onChange={(event) => setMyName(event.target.value)}
             aria-label="Your name"
             placeholder="Your name"
           />
         </div>
+        <div className="mt-3">
+          <input
+            className={inputClass}
+            value={me?.vpa ?? ''}
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            onChange={(event) => me && setPersonVpa(me.id, event.target.value)}
+            aria-label="Your UPI ID"
+            placeholder="Your UPI ID, so people can pay you"
+          />
+        </div>
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Everything is stored on this device only. No account, no server, nothing leaves.
-          Accounts and sync are next.
+          A group stays on this device until you share it. Once you do, everyone in it
+          keeps their own copy and balances stay in step.
         </p>
       </section>
 
@@ -169,26 +193,41 @@ export default function GroupsPage() {
             variant="primary"
             className="w-full"
             onClick={submit}
-            disabled={!name.trim()}
+            disabled={!name.trim() || (unnamed && !myName.trim())}
           >
             Create group
           </Button>
         }
       >
         <div className="space-y-5">
+          {unnamed && (
+            <Field
+              label="Your name"
+              hint="It is what everybody else in the group sees beside the money."
+            >
+              <input
+                className={inputClass}
+                value={myName}
+                onChange={(event) => setMyNameField(event.target.value)}
+                placeholder="Dev"
+                autoFocus
+              />
+            </Field>
+          )}
+
           <Field label="Group name">
             <input
               className={inputClass}
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Goa trip"
-              autoFocus
+              autoFocus={!unnamed}
             />
           </Field>
 
           <Field
             label="Who else is in it"
-            hint="Separate names with commas. No email or phone needed. You can add UPI IDs later."
+            hint="Optional. Leave it empty and send them the group link instead: whoever opens it puts in their own name and UPI ID."
           >
             <input
               className={inputClass}

@@ -29,11 +29,9 @@ export function payloadFor(state: AppState, groupId: string): GroupPayload | nul
 }
 
 /** One person's join link, handed out after a group is shared. */
+/** Somebody in a shared group, and whether they have turned up yet. */
 export interface JoinLink {
-  /** The person's local id, so the sharing device can label the link. */
   personId: string
   name: string
-  /** Absent once the seat is taken: the link is destroyed, not just refused. */
-  url?: string
   claimed: boolean
 }

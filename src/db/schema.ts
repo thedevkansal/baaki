@@ -88,6 +88,15 @@ export const groups = pgTable(
    * member's, or Rahul could reset your seat and take it.
    */
   ownerDeviceId: text('owner_device_id'),
+  /**
+   * One link for the whole group, not one per person.
+   *
+   * You invite people; you do not enrol them. Whoever opens it says who they
+   * are and gives their own UPI ID, which is the only way either of those is
+   * ever right: nobody else knows how Rahul spells his name or which VPA he
+   * actually uses.
+   */
+  inviteToken: text('invite_token').unique(),
   createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
   createdAt: createdAt(),

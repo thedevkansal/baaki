@@ -3,141 +3,192 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Field, inputClass } from '@/components/ui/field'
+import { isValidVpa } from '@/lib/upi/link'
 import { applyPulledGroup } from '@/lib/store/store'
-import { claimSeat, previewClaim, type ClaimPreview } from '@/lib/sync/actions'
+import { joinGroup, previewInvite, type InvitePreview } from '@/lib/sync/actions'
 
 type Stage =
   | { kind: 'loading' }
-  | { kind: 'ready'; preview: ClaimPreview }
-  | { kind: 'joining' }
+  | { kind: 'ready'; preview: InvitePreview }
   | { kind: 'error'; message: string }
 
+/**
+ * The other end of an invite link.
+ *
+ * You say who you are here. The person who made the group cannot spell your
+ * name for you and certainly cannot know your UPI ID, and a VPA typed by
+ * somebody else is a payment to a stranger waiting to happen.
+ */
 export function JoinFlow({ token }: { token: string }) {
   const router = useRouter()
   const [stage, setStage] = useState<Stage>({ kind: 'loading' })
+  const [name, setName] = useState('')
+  const [vpa, setVpa] = useState('')
+  const [seatId, setSeatId] = useState<string | undefined>(undefined)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
-    previewClaim(token).then((preview) => {
+    previewInvite(token).then((preview) => {
       if (!live) return
-      setStage(
-        preview.ok
-          ? { kind: 'ready', preview }
-          : { kind: 'error', message: preview.message ?? 'That link is not valid.' },
-      )
+      if (!preview.ok) {
+        setStage({ kind: 'error', message: preview.message ?? 'That link is not valid.' })
+        return
+      }
+      if (preview.alreadyIn) setName(preview.alreadyIn)
+      setStage({ kind: 'ready', preview })
     })
     return () => {
       live = false
     }
   }, [token])
 
+  const vpaLooksWrong = vpa.trim() !== '' && !isValidVpa(vpa.trim())
+
   const join = async () => {
-    setStage({ kind: 'joining' })
-    const result = await claimSeat(token)
+    setBusy(true)
+    setProblem(null)
+    const result = await joinGroup(token, { seatId, name, vpa })
+    setBusy(false)
     if (!result.ok || !result.payload) {
-      setStage({ kind: 'error', message: result.message ?? 'That did not work.' })
+      setProblem(result.message ?? 'That did not work.')
       return
     }
     applyPulledGroup(result.payload, result.meId)
     router.push(`/app/g/${result.payload.group.id}`)
   }
 
+  if (stage.kind === 'loading') {
+    return (
+      <Shell>
+        <p className="mt-6 text-lg text-muted">Checking that link…</p>
+      </Shell>
+    )
+  }
+
+  if (stage.kind === 'error') {
+    return (
+      <Shell>
+        <h1 className="mt-4 font-display text-4xl leading-tight">{stage.message}</h1>
+        <p className="mt-4 text-sm leading-relaxed text-muted">
+          Ask whoever runs the group to send the link again.
+        </p>
+        <Button className="mt-8 self-start" onClick={() => router.push('/app')}>
+          Go to your groups
+        </Button>
+      </Shell>
+    )
+  }
+
+  const { preview } = stage
+  const seats = preview.freeSeats ?? []
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center px-6 py-16">
-      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-        You have been added to a group
+    <Shell>
+      <h1 className="mt-4 font-display text-4xl leading-tight">
+        Join <span className="text-pos">{preview.groupName}</span>
+      </h1>
+      <p className="mt-4 text-sm leading-relaxed text-muted">
+        {preview.alreadyIn
+          ? `You are already ${preview.alreadyIn} here. You can fix your name or UPI ID below.`
+          : 'Tell them who you are. This phone becomes you in the group, with no account and nothing to install.'}
       </p>
 
-      {stage.kind === 'loading' && (
-        <p className="mt-6 text-lg text-muted">Checking that link…</p>
-      )}
+      <div className="mt-8 space-y-6">
+        {seats.length > 0 && !preview.alreadyIn && (
+          <Field
+            label="Are you one of these?"
+            hint="Names already in the group that nobody has claimed."
+          >
+            <div className="flex flex-wrap gap-2">
+              {seats.map((seat) => (
+                <button
+                  key={seat.personId}
+                  type="button"
+                  onClick={() => {
+                    setSeatId(seat.personId)
+                    setName(seat.name)
+                  }}
+                  aria-pressed={seatId === seat.personId}
+                  className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                    seatId === seat.personId
+                      ? 'border-ink bg-ink text-paper'
+                      : 'border-rule hover:border-ink'
+                  }`}
+                >
+                  {seat.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setSeatId(undefined)
+                  setName('')
+                }}
+                aria-pressed={seatId === undefined}
+                className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                  seatId === undefined
+                    ? 'border-ink bg-ink text-paper'
+                    : 'border-rule hover:border-ink'
+                }`}
+              >
+                I&rsquo;m someone else
+              </button>
+            </div>
+          </Field>
+        )}
 
-      {stage.kind === 'error' && (
-        <>
-          <h1 className="mt-4 font-display text-4xl leading-tight">{stage.message}</h1>
-          <p className="mt-4 text-sm leading-relaxed text-muted">
-            Join links belong to one person and can only be used once. Ask whoever
-            shared the group to send you a fresh one.
-          </p>
-          <Button className="mt-8 self-start" onClick={() => router.push('/app')}>
-            Go to your groups
-          </Button>
-        </>
-      )}
+        <Field label="Your name">
+          <input
+            className={inputClass}
+            value={name}
+            autoFocus
+            placeholder="Rahul"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </Field>
 
-      {(stage.kind === 'ready' || stage.kind === 'joining') && (
-        <ReadyState
-          preview={stage.kind === 'ready' ? stage.preview : undefined}
-          busy={stage.kind === 'joining'}
-          onJoin={join}
-        />
-      )}
-    </main>
+        <Field
+          label="Your UPI ID"
+          hint="Optional, and only you can get it right. It is what people tap to pay you, prefilled with the exact amount."
+          error={vpaLooksWrong ? 'That does not look like a UPI ID. Example: rahul@okhdfcbank' : undefined}
+        >
+          <input
+            className={inputClass}
+            value={vpa}
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="rahul@okhdfcbank"
+            onChange={(event) => setVpa(event.target.value)}
+          />
+        </Field>
+
+        {problem && <p className="text-sm text-neg">{problem}</p>}
+
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full"
+          disabled={busy || name.trim() === '' || vpaLooksWrong}
+          onClick={join}
+        >
+          {busy ? 'Joining…' : preview.alreadyIn ? 'Save and open' : 'Join the group'}
+        </Button>
+      </div>
+    </Shell>
   )
 }
 
-function ReadyState({
-  preview,
-  busy,
-  onJoin,
-}: {
-  preview?: ClaimPreview
-  busy: boolean
-  onJoin: () => void
-}) {
-  if (!preview) return <p className="mt-6 text-lg text-muted">Joining…</p>
-
-  if (preview.alreadyIn) {
-    return (
-      <>
-        <h1 className="mt-4 font-display text-4xl leading-tight">
-          This device is already {preview.alreadyIn} in {preview.groupName}.
-        </h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          One device is one person per group. Otherwise you would be two people in
-          the same ledger, each able to confirm the other&rsquo;s payments. Open this
-          link on {preview.personName}&rsquo;s own phone.
-        </p>
-      </>
-    )
-  }
-
-  if (preview.taken) {
-    return (
-      <>
-        <h1 className="mt-4 font-display text-4xl leading-tight">
-          Somebody already joined with this link.
-        </h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          A link takes one seat and then stops working, so a forwarded link cannot
-          quietly hand your place to someone else.
-        </p>
-      </>
-    )
-  }
-
+function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <h1 className="mt-4 font-display text-4xl leading-tight">
-        You are <span className="text-pos">{preview.personName}</span> in{' '}
-        {preview.groupName}.
-      </h1>
-      <p className="mt-5 text-sm leading-relaxed text-muted">
-        Joining puts the group on this device and makes this browser that person.
-        From then on only you can confirm a payment somebody says they made to you.
-        No account, no email, nothing to install.
+    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center px-6 py-16">
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
+        You have been invited to a group
       </p>
-      <Button variant="primary" size="lg" className="mt-8" disabled={busy} onClick={onJoin}>
-        {busy
-          ? 'Joining…'
-          : preview.mine
-            ? `Open ${preview.groupName}`
-            : `Join as ${preview.personName}`}
-      </Button>
-      <p className="mt-5 font-mono text-[11px] leading-relaxed text-muted">
-        Keep the link to yourself. Until it is used, whoever opens it becomes{' '}
-        {preview.personName}.
-      </p>
-    </>
+      {children}
+    </main>
   )
 }

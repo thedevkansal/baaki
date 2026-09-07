@@ -485,15 +485,15 @@ export function applyPulledGroup(payload: {
   }
 
   const others = current.groups.filter((g) => g.id !== groupId)
+  const existing = current.groups.find((g) => g.id === groupId)
   const pulled: Group = {
     ...payload.group,
     shared: { lastPulledAt: new Date().toISOString() },
+    meId: meId ?? existing?.meId,
   }
 
   commit({
     ...current,
-    // A device that has claimed a seat *is* that person from then on.
-    meId: meId ?? current.meId,
     people: [...peopleById.values()],
     groups: [...others, pulled],
     expenses: [

@@ -70,9 +70,10 @@ const newToken = () => randomBytes(24).toString('base64url')
 export interface ShareResult {
   ok: boolean
   message?: string
-  links?: JoinLink[]
-  /** The local id of the person this device took, if it took one. */
-  meId?: string
+  /** The one link for the whole group. */
+  inviteUrl?: string
+  /** Everybody in the group and whether they have turned up yet. */
+  people?: JoinLink[]
 }
 
 /**
@@ -111,10 +112,12 @@ export async function shareGroup(
           currency: group.currency,
           simplify: group.simplify,
           ownerDeviceId: me,
+          inviteToken: newToken(),
         })
         .onConflictDoUpdate({
           target: groups.localId,
-          // ownerDeviceId is never reassigned: whoever shared it stays owner.
+          // ownerDeviceId and inviteToken are never reassigned: whoever shared
+          // it stays owner, and a link already sent out keeps working.
           set: { name: group.name, currency: group.currency, simplify: group.simplify },
         })
         .returning({ id: groups.id })
@@ -130,14 +133,9 @@ export async function shareGroup(
             localId: person.id,
             displayName: person.name,
             vpa: person.vpa ?? null,
-            /**
-             * The sharing device takes its own seat immediately and gets no
-             * link at all. A token for a seat that is already taken is a live
-             * bearer secret guarding nothing.
-             */
-            ...(person.id === meLocalId
-              ? { claimToken: null, claimedAt: new Date(), deviceId: me }
-              : { claimToken: newToken() }),
+            // The sharing device takes its own seat on the spot; everybody
+            // else claims one through the group's invite link.
+            ...(person.id === meLocalId ? { claimedAt: new Date(), deviceId: me } : {}),
           })
           .onConflictDoUpdate({
             target: [participants.groupId, participants.localId],
@@ -251,17 +249,22 @@ export async function shareGroup(
           })
       }
 
-      return rows
+      const [withToken] = await tx
+        .select({ inviteToken: groups.inviteToken })
+        .from(groups)
+        .where(eq(groups.id, serverGroupId))
+        .limit(1)
+
+      return { rows, inviteToken: withToken?.inviteToken ?? '' }
     })
 
     return {
       ok: true,
-      meId: meLocalId,
-      links: seats.map((seat) => ({
+      inviteUrl: `${base}/join/${seats.inviteToken}`,
+      people: seats.rows.map((seat) => ({
         personId: seat.localId,
         name: seat.displayName,
         claimed: Boolean(seat.claimedAt),
-        ...(seat.claimToken ? { url: `${base}/join/${seat.claimToken}` } : {}),
       })),
     }
   } catch (error) {
@@ -272,70 +275,55 @@ export async function shareGroup(
   }
 }
 
-export interface ClaimPreview {
+export interface InvitePreview {
   ok: boolean
   message?: string
   groupName?: string
-  personName?: string
-  /** True when this very device already holds the seat. */
-  mine?: boolean
-  /** True when somebody else got here first. */
-  taken?: boolean
-  /** The name this device already holds in that group, if it holds one. */
+  /** Names already in the group that nobody has claimed yet. */
+  freeSeats?: { personId: string; name: string }[]
+  /** The name this device already goes by here, if it is already in. */
   alreadyIn?: string
 }
 
-/** What a join link shows before anyone commits to it. */
-export async function previewClaim(token: string): Promise<ClaimPreview> {
+/**
+ * What an invite link shows before anyone commits to it.
+ *
+ * Nothing is claimed by loading the page: a link opened by a chat app fetching
+ * a thumbnail, or by the wrong person by accident, must not take a seat.
+ */
+export async function previewInvite(token: string): Promise<InvitePreview> {
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
   const me = await deviceId()
 
-  const [seat] = await db
+  const [group] = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(groups)
+    .where(eq(groups.inviteToken, token))
+    .limit(1)
+  if (!group) return { ok: false, message: 'That link is not valid.' }
+
+  const seats = await db
     .select({
-      groupId: participants.groupId,
+      localId: participants.localId,
       displayName: participants.displayName,
       claimedAt: participants.claimedAt,
       deviceId: participants.deviceId,
-      groupName: groups.name,
     })
     .from(participants)
-    .innerJoin(groups, eq(groups.id, participants.groupId))
-    .where(eq(participants.claimToken, token))
-    .limit(1)
+    .where(eq(participants.groupId, group.id))
 
-  if (!seat) return { ok: false, message: 'That link is not valid.' }
+  const mine = seats.find((seat) => seat.deviceId === me)
 
   return {
     ok: true,
-    groupName: seat.groupName,
-    personName: seat.displayName,
-    mine: seat.deviceId === me,
-    taken: Boolean(seat.claimedAt) && seat.deviceId !== me,
-    alreadyIn: await otherSeatOn(db, seat.groupId, me, token),
+    groupName: group.name,
+    alreadyIn: mine?.displayName,
+    freeSeats: seats
+      .filter((seat) => !seat.claimedAt)
+      .map((seat) => ({ personId: seat.localId, name: seat.displayName })),
   }
-}
-
-/**
- * The name this device already goes by in a group, if any.
- *
- * One device is one person per group. Without this, opening a second link on
- * the same phone would quietly make you two people in the same ledger, and both
- * of you could confirm the other's payments.
- */
-async function otherSeatOn(
-  db: Db,
-  groupId: string,
-  device: string,
-  exceptToken: string,
-): Promise<string | undefined> {
-  const [held] = await db
-    .select({ displayName: participants.displayName, claimToken: participants.claimToken })
-    .from(participants)
-    .where(and(eq(participants.groupId, groupId), eq(participants.deviceId, device)))
-    .limit(1)
-  return held && held.claimToken !== exceptToken ? held.displayName : undefined
 }
 
 export interface PullResult {
@@ -347,59 +335,78 @@ export interface PullResult {
 }
 
 /**
- * Take a seat, and come back with the whole group.
+ * Join a group through its invite link.
  *
- * A seat binds to the first device that claims it and stays bound. That is the
- * whole security model right now and it is worth saying plainly: the link is
- * the credential, so whoever holds it before the seat is taken can become that
- * person. It buys joining with no account, no email and no app install, and
- * what it risks is a shared expense ledger, never money.
+ * You say who you are and give your own UPI ID. Nobody else can get either
+ * right: the person who made the group does not know how you spell your name
+ * or which VPA you actually use, and a wrong VPA sends money to a stranger.
+ *
+ * Either take a name already in the group, if whoever made it listed you, or
+ * arrive as somebody new. Both bind the seat to this device from then on.
  */
-export async function claimSeat(token: string): Promise<PullResult> {
+export async function joinGroup(
+  token: string,
+  who: { seatId?: string; name: string; vpa?: string },
+): Promise<PullResult> {
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
+
+  const name = who.name.trim()
+  if (!name) return { ok: false, message: 'Give a name so people know who you are.' }
 
   const db = getDb()
   const me = await deviceId()
+  const vpa = who.vpa?.trim() || null
 
-  const [seat] = await db
-    .select({
-      id: participants.id,
-      groupId: participants.groupId,
-      localId: participants.localId,
-      claimedAt: participants.claimedAt,
-      deviceId: participants.deviceId,
-    })
-    .from(participants)
-    .where(eq(participants.claimToken, token))
+  const [group] = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.inviteToken, token))
     .limit(1)
+  if (!group) return { ok: false, message: 'That link is not valid.' }
 
-  if (!seat) return { ok: false, message: 'That link is not valid.' }
-  if (seat.claimedAt && seat.deviceId !== me) {
-    return { ok: false, message: 'Somebody has already joined with this link.' }
-  }
+  const held = await seatOf(db, group.id, me)
 
-  const held = await otherSeatOn(db, seat.groupId, me, token)
   if (held) {
-    return {
-      ok: false,
-      message: `This device is already ${held} in that group.`,
-    }
-  }
-
-  if (!seat.claimedAt) {
-    /**
-     * The token is destroyed, not just marked used. A link is a bearer secret,
-     * and the seat is bound to the device from here on, so keeping the secret
-     * around only leaves something to leak out of a chat history later.
-     */
+    // Already in. Let them correct their own name and VPA, nothing else.
     await db
       .update(participants)
-      .set({ claimedAt: new Date(), deviceId: me, claimToken: null })
-      .where(eq(participants.id, seat.id))
+      .set({ displayName: name, vpa })
+      .where(eq(participants.id, held.id))
+  } else if (who.seatId) {
+    /**
+     * Taking a name the group already listed. Conditional on the seat still
+     * being free, so two people opening the same link at once cannot both
+     * become Rahul: the second update matches nothing and is told so.
+     */
+    const taken = await db
+      .update(participants)
+      .set({ displayName: name, vpa, claimedAt: new Date(), deviceId: me })
+      .where(
+        and(
+          eq(participants.groupId, group.id),
+          eq(participants.localId, who.seatId),
+          isNull(participants.claimedAt),
+        ),
+      )
+      .returning({ id: participants.id })
+
+    if (taken.length === 0) {
+      return { ok: false, message: 'Somebody just took that name. Pick another.' }
+    }
+  } else {
+    await db.insert(participants).values({
+      groupId: group.id,
+      localId: `p_${randomBytes(6).toString('hex')}`,
+      displayName: name,
+      vpa,
+      claimedAt: new Date(),
+      deviceId: me,
+    })
   }
 
-  const payload = await readGroup(db, seat.groupId)
-  if (!payload) return { ok: false, message: 'That group could not be read.' }
+  const seat = await seatOf(db, group.id, me)
+  const payload = await readGroup(db, group.id)
+  if (!payload || !seat) return { ok: false, message: 'That group could not be read.' }
   return { ok: true, payload, meId: seat.localId }
 }
 
@@ -595,39 +602,47 @@ export async function answerSettlement(
 }
 
 /**
- * Issue a fresh join link for somebody, releasing whatever device held it.
+ * Put a disputed payment back to the payee.
  *
- * The lost-phone case. Only the device that shared the group may do this: a
- * seat is somebody's identity in the ledger, so letting any member reset any
- * seat would let one member take another's place.
+ * Only the person who said they paid may do this, and only to something that
+ * was actually disputed: it is the answer to "it has not arrived", not a way to
+ * keep asking somebody to confirm a payment they already refused once.
  */
-export async function reissueLink(
+export async function reproposeSettlement(
   localGroupId: string,
-  personLocalId: string,
-): Promise<{ ok: boolean; message?: string; url?: string }> {
+  settlementLocalId: string,
+): Promise<{ ok: boolean; message?: string }> {
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
   const me = await deviceId()
-  const base = await origin()
-
-  const [group] = await db
-    .select({ id: groups.id, ownerDeviceId: groups.ownerDeviceId })
-    .from(groups)
-    .where(eq(groups.localId, localGroupId))
-    .limit(1)
+  const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
-  if (group.ownerDeviceId !== me) {
-    return { ok: false, message: 'Only the device that shared this group can send a new link.' }
+
+  const seat = await seatOf(db, group.id, me)
+  if (!seat) return { ok: false, message: 'This device is not in that group.' }
+
+  const [row] = await db
+    .select({
+      id: settlements.id,
+      fromParticipantId: settlements.fromParticipantId,
+      status: settlements.status,
+    })
+    .from(settlements)
+    .where(and(eq(settlements.groupId, group.id), eq(settlements.localId, settlementLocalId)))
+    .limit(1)
+
+  if (!row) return { ok: false, message: 'That payment is not on the server.' }
+  if (row.fromParticipantId !== seat.id) {
+    return { ok: false, message: 'Only the person who paid can ask again.' }
+  }
+  if (row.status !== 'disputed') {
+    return { ok: false, message: 'That payment is not disputed.' }
   }
 
-  const token = newToken()
-  const changed = await db
-    .update(participants)
-    .set({ claimToken: token, claimedAt: null, deviceId: null })
-    .where(and(eq(participants.groupId, group.id), eq(participants.localId, personLocalId)))
-    .returning({ id: participants.id })
-
-  if (changed.length === 0) return { ok: false, message: 'That person is not in the group.' }
-  return { ok: true, url: `${base}/join/${token}` }
+  await db
+    .update(settlements)
+    .set({ status: 'proposed', confirmedAt: null })
+    .where(eq(settlements.id, row.id))
+  return { ok: true }
 }

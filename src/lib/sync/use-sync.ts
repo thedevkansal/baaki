@@ -74,7 +74,7 @@ export async function pushGroup(groupId: string) {
   if (!group?.shared) return
 
   const payload = payloadFor(state, groupId)
-  if (payload) await shareGroup(payload, state.meId)
+  if (payload) await shareGroup(payload, group.meId ?? state.meId)
 }
 
 /**
