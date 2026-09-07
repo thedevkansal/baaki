@@ -22,7 +22,13 @@ function emptyState(): AppState {
   return {
     version: 1,
     meId,
-    people: [{ id: meId, name: 'You' }],
+    /**
+     * No name until somebody gives one. "You" is what the screen calls the
+     * person holding it, not a name: stored as one it reaches everybody else's
+     * phone as a person actually called You, which is what "Settle with You"
+     * was.
+     */
+    people: [{ id: meId, name: '' }],
     groups: [],
     expenses: [],
     settlements: [],
@@ -139,7 +145,7 @@ export function setMyName(name: string) {
   commit({
     ...current,
     people: current.people.map((p) =>
-      p.id === current.meId ? { ...p, name: name.trim() || 'You' } : p,
+      p.id === current.meId ? { ...p, name: name.trim() } : p,
     ),
   })
   syncedPerson(current.meId)
@@ -178,7 +184,7 @@ export function updateMyProfile(patch: { name?: string; vpa?: string }) {
       mine.has(person.id)
         ? {
             ...person,
-            ...(name !== undefined ? { name: name || 'You' } : {}),
+            ...(name !== undefined ? { name } : {}),
             ...(vpa !== undefined ? { vpa: vpa || undefined } : {}),
           }
         : person,

@@ -143,7 +143,11 @@ export function useGroupLedger(groupId: string): GroupLedger {
       transfers,
       provenance,
       pairwiseCount: edges.length,
-      nameOf: (id) => byId.get(id)?.name ?? 'Someone',
+      /**
+       * "You" is a label the reader's own screen applies, never stored. Anybody
+       * else without a name has not filled one in yet.
+       */
+      nameOf: (id) => byId.get(id)?.name || (id === myId ? 'You' : 'Someone'),
       personOf: (id) => byId.get(id),
     }
   }, [state, groupId])

@@ -167,21 +167,6 @@ export async function shareGroup(
           .onConflictDoNothing()
       }
 
-      const mine = payload.people.find((person) => person.id === meLocalId)
-      if (mine) {
-        // Your own name and UPI ID, which are yours alone to set.
-        await tx
-          .update(participants)
-          .set({ displayName: mine.name, vpaEncrypted: sealVpa(mine.vpa) })
-          .where(
-            and(
-              eq(participants.groupId, serverGroupId),
-              eq(participants.localId, meLocalId),
-              seatMatches(who),
-            ),
-          )
-      }
-
       /**
        * The owner may still fix a name nobody has claimed: "p1" was a
        * placeholder for a person who has not turned up, and correcting it to
@@ -217,11 +202,32 @@ export async function shareGroup(
           claimToken: participants.claimToken,
           claimedAt: participants.claimedAt,
           deviceId: participants.deviceId,
+          userId: participants.userId,
         })
         .from(participants)
         .where(eq(participants.groupId, serverGroupId))
 
       const seatByLocal = new Map(rows.map((r) => [r.localId, r.id]))
+
+      /**
+       * Your own name and UPI ID, which are yours alone to set.
+       *
+       * Keyed on the seat this device actually holds, not on the one the client
+       * says is its own. When those disagreed the update matched no rows, the
+       * server kept whatever it had, and the next pull put it back: a rename
+       * that saved locally and then silently reverted seconds later.
+       */
+      const mySeat = rows.find(
+        (row) => row.deviceId === me || (who.userId && row.userId === who.userId),
+      )
+      const mine = mySeat && payload.people.find((person) => person.id === mySeat.localId)
+      if (mySeat && mine) {
+        await tx
+          .update(participants)
+          .set({ displayName: mine.name, vpaEncrypted: sealVpa(mine.vpa) })
+          .where(eq(participants.id, mySeat.id))
+      }
+
 
       for (const expense of payload.expenses) {
         const [row] = await tx

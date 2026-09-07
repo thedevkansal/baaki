@@ -43,6 +43,7 @@ export default function GroupsPage() {
   // "You" is the placeholder a fresh device starts with, not a name somebody
   // chose. Anything that puts a name in front of other people asks for a real
   // one first.
+  // Older devices stored the placeholder as a real name; treat it as unset.
   const unnamed = !me?.name || me.name === 'You'
   const storedName = unnamed ? '' : (me?.name ?? '')
   const storedVpa = me?.vpa ?? ''
