@@ -735,6 +735,11 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           groupId={groupId}
           groupName={group.name}
           shared={Boolean(group.shared)}
+          joined={(group.claimed ?? []).includes(settling.to.id)}
+          onInvite={() => {
+            setSettling(null)
+            setShareOpen(true)
+          }}
           from={me}
           to={settling.to}
           amount={settling.amount}

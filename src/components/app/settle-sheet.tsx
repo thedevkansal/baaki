@@ -22,6 +22,8 @@ export function SettleSheet({
   to,
   amount,
   shared,
+  joined,
+  onInvite,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -32,6 +34,10 @@ export function SettleSheet({
   amount: Money
   /** In a shared group a UPI ID is its owner's to set, and nobody else's. */
   shared: boolean
+  /** Whether they have actually turned up on a device of their own. */
+  joined: boolean
+  /** Opens the invite screen, for the case where they have not. */
+  onInvite: () => void
 }) {
   /**
    * Their UPI ID, which in a shared group is theirs and is never typed here.
@@ -107,29 +113,47 @@ export function SettleSheet({
             </div>
           ) : (
             <div className="rounded-xl border border-rule px-4 py-4">
+              {/**
+                * A UPI ID is required to join, so somebody without one has
+                * almost always not joined: they are a name you typed, with no
+                * device to be asked anything. Sending them the group is the
+                * thing to do, and it collects their UPI ID on the way in.
+                *
+                * The ask survives for the case that is left: somebody who
+                * joined and then cleared their UPI ID.
+                */}
               <p className="text-sm leading-relaxed">
-                {to.name} has not added a UPI ID yet.
+                {joined
+                  ? `${to.name} has no UPI ID on their account.`
+                  : `${to.name} has not joined yet, so there is no UPI ID to pay.`}
               </p>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Only they can add it. Typing it for them is how money reaches the wrong
-                person, and Baaki cannot see the payment to catch it.
+                {joined
+                  ? 'Only they can add it. Typing it for them is how money reaches the wrong person, and Baaki cannot see the payment to catch it.'
+                  : 'Send them the group. They put in their own name and UPI ID as they join, which is the only way either is right.'}
               </p>
               {/**
                 * The ask reaches them inside Baaki rather than asking you to
                 * go and chase them through some other app, which is the
                 * friction this whole product exists to remove.
                 */}
-              <Button
-                size="sm"
-                className="mt-3"
-                disabled={asked}
-                onClick={async () => {
-                  const result = await sendNudge(groupId, to.id)
-                  setAsked(result.ok)
-                }}
-              >
-                {asked ? `${to.name} has been asked` : `Ask ${to.name} for it`}
-              </Button>
+              {joined ? (
+                <Button
+                  size="sm"
+                  className="mt-3"
+                  disabled={asked}
+                  onClick={async () => {
+                    const result = await sendNudge(groupId, to.id)
+                    setAsked(result.ok)
+                  }}
+                >
+                  {asked ? `${to.name} has been asked` : `Ask ${to.name} for it`}
+                </Button>
+              ) : (
+                <Button size="sm" variant="primary" className="mt-3" onClick={onInvite}>
+                  Send {to.name} the group
+                </Button>
+              )}
             </div>
           )
         ) : (
