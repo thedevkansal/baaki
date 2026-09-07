@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { useDismiss } from '@/lib/use-dismiss'
 import { supabaseBrowser } from '@/lib/auth/client'
 import { currentAccount, signOut, type Account } from '@/lib/auth/actions'
 
@@ -29,14 +31,9 @@ export function AuthButton() {
   const open = openFor === pathname
   const setOpen = (next: boolean) => setOpenFor(next ? pathname : null)
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenFor(null)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  const shell = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setOpenFor(null), [])
+  useDismiss(shell, open, close)
 
   useEffect(() => {
     let live = true
@@ -75,7 +72,7 @@ export function AuthButton() {
   const initial = (account.email ?? account.name ?? '?').trim().charAt(0).toUpperCase()
 
   return (
-    <div className="relative">
+    <div className="relative" ref={shell}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -87,28 +84,20 @@ export function AuthButton() {
       </button>
 
       {open && (
-        <>
-          <button
-            type="button"
-            aria-hidden
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 cursor-default"
-          />
-          <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-rule bg-paper-raised p-4 shadow-lg">
-            <p className="truncate text-sm font-medium">{account.email ?? account.name}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              {account.seats === 0
-                ? 'No groups attached yet.'
-                : `${account.seats} ${account.seats === 1 ? 'group' : 'groups'} follow this account.`}
-            </p>
-            <form action={signOut} className="mt-4">
-              <Button size="sm" className="w-full" type="submit">
-                Sign out
-              </Button>
-            </form>
-          </div>
-        </>
+        <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl border border-rule bg-paper-raised p-4 shadow-lg">
+          <p className="truncate text-sm font-medium">{account.email ?? account.name}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {account.seats === 0
+              ? 'No groups attached yet.'
+              : `${account.seats} ${account.seats === 1 ? 'group' : 'groups'} follow this account.`}
+          </p>
+          <form action={signOut} className="mt-4">
+            {/* The one action here that undoes something, coloured like it. */}
+            <Button size="sm" variant="danger" className="w-full" type="submit">
+              Sign out
+            </Button>
+          </form>
+        </div>
       )}
     </div>
   )

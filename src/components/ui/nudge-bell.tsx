@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useDismiss } from '@/lib/use-dismiss'
 import { useAppState } from '@/lib/store/use-store'
 
 /**
@@ -15,11 +16,14 @@ import { useAppState } from '@/lib/store/use-store'
 export function NudgeBell() {
   const nudges = useAppState().nudges ?? []
   const [open, setOpen] = useState(false)
+  const shell = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  useDismiss(shell, open, close)
 
   if (nudges.length === 0) return null
 
   return (
-    <div className="relative">
+    <div className="relative" ref={shell}>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -46,37 +50,27 @@ export function NudgeBell() {
       </button>
 
       {open && (
-        <>
-          {/* Clicking anywhere else puts it away, without trapping focus. */}
-          <button
-            type="button"
-            aria-hidden
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 cursor-default"
-          />
-          <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-rule bg-paper-raised p-2 shadow-lg">
-            <ul className="space-y-1">
-              {nudges.map((nudge) => (
-                <li key={nudge.id}>
-                  <Link
-                    href={`/app/g/${nudge.groupId}`}
-                    onClick={() => setOpen(false)}
-                    className="block rounded-xl px-3 py-3 transition-colors hover:bg-paper-sunken"
-                  >
-                    <p className="text-sm leading-relaxed">
-                      <span className="font-medium">{nudge.fromName}</span> asked you to
-                      add your UPI ID so they can pay you back.
-                    </p>
-                    <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-                      {nudge.groupName}
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
+        <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-rule bg-paper-raised p-2 shadow-lg">
+          <ul className="space-y-1">
+            {nudges.map((nudge) => (
+              <li key={nudge.id}>
+                <Link
+                  href={`/app/g/${nudge.groupId}`}
+                  onClick={() => setOpen(false)}
+                  className="block rounded-xl px-3 py-3 transition-colors hover:bg-paper-sunken"
+                >
+                  <p className="text-sm leading-relaxed">
+                    <span className="font-medium">{nudge.fromName}</span> asked you to add
+                    your UPI ID so they can pay you back.
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+                    {nudge.groupName}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
