@@ -129,10 +129,14 @@ export async function shareGroup(
             localId: person.id,
             displayName: person.name,
             vpa: person.vpa ?? null,
-            claimToken: newToken(),
-            // The device doing the sharing takes its own seat immediately, so
-            // the link for it can never be used by somebody else.
-            ...(person.id === meLocalId ? { claimedAt: new Date(), deviceId: me } : {}),
+            /**
+             * The sharing device takes its own seat immediately and gets no
+             * link at all. A token for a seat that is already taken is a live
+             * bearer secret guarding nothing.
+             */
+            ...(person.id === meLocalId
+              ? { claimToken: null, claimedAt: new Date(), deviceId: me }
+              : { claimToken: newToken() }),
           })
           .onConflictDoUpdate({
             target: [participants.groupId, participants.localId],
@@ -252,14 +256,12 @@ export async function shareGroup(
     return {
       ok: true,
       meId: meLocalId,
-      links: seats
-        .filter((seat) => seat.claimToken !== null)
-        .map((seat) => ({
-          personId: seat.localId,
-          name: seat.displayName,
-          url: `${base}/join/${seat.claimToken}`,
-          claimed: Boolean(seat.claimedAt),
-        })),
+      links: seats.map((seat) => ({
+        personId: seat.localId,
+        name: seat.displayName,
+        claimed: Boolean(seat.claimedAt),
+        ...(seat.claimToken ? { url: `${base}/join/${seat.claimToken}` } : {}),
+      })),
     }
   } catch (error) {
     return {

@@ -33,6 +33,7 @@ export interface JoinLink {
   /** The person's local id, so the sharing device can label the link. */
   personId: string
   name: string
-  url: string
+  /** Absent once the seat is taken: the link is destroyed, not just refused. */
+  url?: string
   claimed: boolean
 }

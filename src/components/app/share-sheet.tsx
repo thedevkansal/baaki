@@ -52,6 +52,7 @@ export function ShareSheet({
   }
 
   const copy = (link: JoinLink) => {
+    if (!link.url) return
     void navigator.clipboard.writeText(link.url)
     setCopied(link.personId)
   }
@@ -125,7 +126,7 @@ export function ShareSheet({
                   <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
                     this device
                   </span>
-                ) : link.claimed ? (
+                ) : link.claimed || !link.url ? (
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-pos">
                       joined
