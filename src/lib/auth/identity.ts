@@ -1,7 +1,7 @@
 import 'server-only'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import type { getDb } from '@/db/client'
-import { participants, users } from '@/db/schema'
+import { participants, paymentIds, users } from '@/db/schema'
 import { currentAuthUser } from './server'
 
 type Db = ReturnType<typeof getDb>
@@ -99,4 +99,33 @@ export async function callerUserId(db: Db): Promise<string | null> {
       (auth.user_metadata?.name as string | undefined) ??
       null,
   })
+}
+
+/**
+ * Remember an account's UPI ID, so it follows the person rather than the group.
+ *
+ * A VPA typed when joining one group is the same VPA in the next one. Keeping
+ * it against the account means somebody signed in is asked once, ever, instead
+ * of once per group, which is also the difference between an optional account
+ * being worth having and being a chore.
+ */
+export async function rememberAccountVpa(db: Db, userId: string, sealed: string) {
+  await db
+    .insert(paymentIds)
+    .values({ userId, kind: 'upi', valueEncrypted: sealed, isDefault: true })
+    .onConflictDoUpdate({
+      target: [paymentIds.userId, paymentIds.kind],
+      targetWhere: sql`is_default`,
+      set: { valueEncrypted: sealed },
+    })
+}
+
+/** The account's default UPI ID, still encrypted. Null if they have none. */
+export async function accountVpa(db: Db, userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ value: paymentIds.valueEncrypted })
+    .from(paymentIds)
+    .where(and(eq(paymentIds.userId, userId), eq(paymentIds.isDefault, true)))
+    .limit(1)
+  return row?.value ?? null
 }

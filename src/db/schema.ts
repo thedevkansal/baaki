@@ -71,7 +71,17 @@ export const paymentIds = pgTable(
     isDefault: boolean('is_default').notNull().default(false),
     createdAt: createdAt(),
   },
-  (table) => [index('payment_ids_user_idx').on(table.userId)],
+  (table) => [
+    index('payment_ids_user_idx').on(table.userId),
+    /**
+     * One default of a kind per person. Somebody may keep several UPI IDs, but
+     * exactly one of them is the one a payment link is built from, and "which
+     * one did it use" is not a question anybody should have to ask about money.
+     */
+    uniqueIndex('payment_ids_default_key')
+      .on(table.userId, table.kind)
+      .where(sql`is_default`),
+  ],
 )
 
 export const groups = pgTable(
@@ -128,7 +138,15 @@ export const participants = pgTable(
       .references(() => groups.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     displayName: text('display_name').notNull(),
-    vpa: text('vpa'),
+    /**
+     * The UPI ID, encrypted with AES-GCM. See lib/auth/payment-id.
+     *
+     * On participants rather than only in payment_ids because most people here
+     * have no account: a ghost somebody typed a name for, or a person who
+     * joined by link and never signed in, still needs somewhere to keep the
+     * one field that decides where money goes.
+     */
+    vpaEncrypted: text('vpa_encrypted'),
     /**
      * What this person may do to the group rather than to the ledger.
      *

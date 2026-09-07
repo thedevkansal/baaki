@@ -38,6 +38,8 @@ export function JoinFlow({ token }: { token: string }) {
         return
       }
       if (preview.alreadyIn) setName(preview.alreadyIn)
+      // Signed in and already gave it in another group: do not ask twice.
+      if (preview.knownVpa) setVpa(preview.knownVpa)
       setStage({ kind: 'ready', preview })
     })
     return () => {
@@ -158,7 +160,11 @@ export function JoinFlow({ token }: { token: string }) {
           */}
         <Field
           label="Your UPI ID"
-          hint="What people tap to pay you, with the amount already filled in."
+          hint={
+            preview.knownVpa
+              ? "From your account. Change it here if this group should use a different one."
+              : "What people tap to pay you, with the amount already filled in."
+          }
           error={vpaLooksWrong ? 'That does not look like a UPI ID. Example: rahul@okhdfcbank' : undefined}
         >
           <input

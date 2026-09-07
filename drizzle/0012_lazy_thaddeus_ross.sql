@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "payment_ids_default_key" ON "payment_ids" USING btree ("user_id","kind") WHERE is_default;

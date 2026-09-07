@@ -5,7 +5,14 @@ import { headers } from 'next/headers'
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { getDb, isDatabaseConfigured } from '@/db/client'
 import { deviceId } from '@/lib/auth/device'
-import { callerUserId, seatMatches, type Caller } from '@/lib/auth/identity'
+import { canEncryptPaymentIds, decryptPaymentId, encryptPaymentId } from '@/lib/auth/payment-id'
+import {
+  accountVpa,
+  callerUserId,
+  rememberAccountVpa,
+  seatMatches,
+  type Caller,
+} from '@/lib/auth/identity'
 import {
   expensePayers,
   expenseShares,
@@ -26,6 +33,21 @@ type Db = ReturnType<typeof getDb>
  * same question. A seat answers to the device that claimed it and, once it has
  * been adopted, to the account that owns it from any device.
  */
+/**
+ * A UPI ID on its way into the database.
+ *
+ * Encryption is not optional in the sense of "store it plain if the key is
+ * missing": a deployment without a key stores no UPI IDs at all, because
+ * silently downgrading to plaintext is how a security property gets lost
+ * without anybody deciding to lose it.
+ */
+function sealVpa(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+  if (!canEncryptPaymentIds()) return null
+  return encryptPaymentId(trimmed)
+}
+
 async function caller(db: Db): Promise<Caller> {
   return { deviceId: await deviceId(), userId: await callerUserId(db) }
 }
@@ -130,7 +152,7 @@ export async function shareGroup(
             groupId: serverGroupId,
             localId: person.id,
             displayName: person.name,
-            vpa: person.vpa ?? null,
+            vpaEncrypted: sealVpa(person.vpa),
             // The sharing device takes its own seat on the spot; everybody
             // else arrives through the group's invite link.
             ...(person.id === meLocalId
@@ -150,7 +172,7 @@ export async function shareGroup(
         // Your own name and UPI ID, which are yours alone to set.
         await tx
           .update(participants)
-          .set({ displayName: mine.name, vpa: mine.vpa ?? null })
+          .set({ displayName: mine.name, vpaEncrypted: sealVpa(mine.vpa) })
           .where(
             and(
               eq(participants.groupId, serverGroupId),
@@ -326,6 +348,8 @@ export interface InvitePreview {
   freeSeats?: { personId: string; name: string }[]
   /** The name this device already goes by here, if it is already in. */
   alreadyIn?: string
+  /** This account's UPI ID from another group, so it can be prefilled. */
+  knownVpa?: string
 }
 
 /**
@@ -338,7 +362,8 @@ export async function previewInvite(token: string): Promise<InvitePreview> {
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
+  const who = await caller(db)
+  const me = who.deviceId
 
   const [group] = await db
     .select({ id: groups.id, name: groups.name })
@@ -359,10 +384,14 @@ export async function previewInvite(token: string): Promise<InvitePreview> {
 
   const mine = seats.find((seat) => seat.deviceId === me)
 
+  /** Offered back so a signed-in person is not asked for it a second time. */
+  const known = who.userId ? await accountVpa(db, who.userId) : null
+
   return {
     ok: true,
     groupName: group.name,
     alreadyIn: mine?.displayName,
+    knownVpa: (known && decryptPaymentId(known)) || undefined,
     freeSeats: seats
       .filter((seat) => !seat.claimedAt)
       .map((seat) => ({ personId: seat.localId, name: seat.displayName })),
@@ -417,7 +446,7 @@ export async function joinGroup(
     // Already in. Let them correct their own name and VPA, nothing else.
     await db
       .update(participants)
-      .set({ displayName: name, vpa })
+      .set({ displayName: name, vpaEncrypted: sealVpa(vpa) })
       .where(eq(participants.id, held.id))
   } else if (who.seatId) {
     /**
@@ -429,7 +458,7 @@ export async function joinGroup(
       .update(participants)
       .set({
         displayName: name,
-        vpa,
+        vpaEncrypted: sealVpa(vpa),
         claimedAt: new Date(),
         deviceId: me,
         // Recorded now rather than at the next sign-in, so a seat taken while
@@ -453,12 +482,19 @@ export async function joinGroup(
       groupId: group.id,
       localId: `p_${randomBytes(6).toString('hex')}`,
       displayName: name,
-      vpa,
+      vpaEncrypted: sealVpa(vpa),
       claimedAt: new Date(),
       deviceId: me,
       userId: mine.userId,
     })
   }
+
+  /**
+   * Kept against the account as well as the seat, so the next group does not
+   * ask again. Someone signed in gives their UPI ID once, ever.
+   */
+  const sealed = sealVpa(vpa)
+  if (mine.userId && sealed) await rememberAccountVpa(db, mine.userId, sealed)
 
   const seat = await seatOf(db, group.id, mine)
   const payload = await readGroup(db, group.id, mine)
@@ -547,7 +583,7 @@ async function readGroup(
          * have one, so it is filtered here rather than deleted on a write that
          * might never happen.
          */
-        if (row.kind === 'add-upi' && mySeat.vpa) continue
+        if (row.kind === 'add-upi' && mySeat.vpaEncrypted) continue
         asks.push({
           id: row.id,
           groupId: group.localId,
@@ -573,11 +609,15 @@ async function readGroup(
       claimed: seats.filter((s) => s.claimedAt).map((s) => s.localId),
       admins: seats.filter((s) => s.role === 'admin').map((s) => s.localId),
     },
-    people: seats.map((s) => ({
-      id: s.localId,
-      name: s.displayName,
-      ...(s.vpa ? { vpa: s.vpa } : {}),
-    })),
+    people: seats.map((seat) => {
+      /**
+       * A UPI ID that fails its authentication tag is not a UPI ID to pay: the
+       * settle screen then says there is none and offers to ask for it, which
+       * is the same safe path as never having had one.
+       */
+      const vpa = seat.vpaEncrypted ? decryptPaymentId(seat.vpaEncrypted) : null
+      return { id: seat.localId, name: seat.displayName, ...(vpa ? { vpa } : {}) }
+    }),
     expenses: bills.map((bill) => ({
       id: bill.localId,
       groupId: group.localId,
