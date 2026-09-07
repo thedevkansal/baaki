@@ -285,6 +285,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         <ul className="mt-6 space-y-2">
           {pending.map((s) => {
             const iPaid = s.fromId === state.meId
+            const paidMe = s.toId === state.meId
             const amount = formatMoney(money(BigInt(s.minor), currency))
             return (
               <li
@@ -295,12 +296,18 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   {iPaid ? (
                     <>
                       You paid <span className="font-medium">{ledger.nameOf(s.toId)}</span>{' '}
-                      {amount}. Waiting for them to confirm
+                      {amount}. Waiting for them to confirm.
+                    </>
+                  ) : paidMe ? (
+                    <>
+                      <span className="font-medium">{ledger.nameOf(s.fromId)}</span> says
+                      they paid you {amount}.
                     </>
                   ) : (
                     <>
                       <span className="font-medium">{ledger.nameOf(s.fromId)}</span> says
-                      they paid you {amount}
+                      they paid <span className="font-medium">{ledger.nameOf(s.toId)}</span>{' '}
+                      {amount}.
                     </>
                   )}
                 </span>
@@ -313,7 +320,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                     variant="primary"
                     onClick={() => setSettlementStatus(s.id, 'confirmed')}
                   >
-                    {iPaid ? `${ledger.nameOf(s.toId)} confirmed` : 'Confirm'}
+                    {paidMe ? 'Confirm' : `${ledger.nameOf(s.toId)} confirmed`}
                   </Button>
                 </div>
               </li>
