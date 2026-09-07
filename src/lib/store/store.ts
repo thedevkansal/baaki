@@ -280,6 +280,77 @@ export function deleteSettlement(settlementId: string) {
 }
 
 /**
+ * Bring a group over from a Splitwise export.
+ *
+ * `meName` says which of the exported people is the person doing the import,
+ * so their existing identity is reused rather than a duplicate of themselves
+ * being created alongside it.
+ */
+export function importGroup(input: {
+  name: string
+  currency: string
+  people: string[]
+  meName: string
+  rows: {
+    date: string
+    description: string
+    category: string
+    payers: { name: string; minor: bigint }[]
+    shares: { name: string; minor: bigint }[]
+  }[]
+}): Group {
+  const current = load()
+
+  const idByName = new Map<string, string>()
+  const created: Person[] = []
+  for (const name of input.people) {
+    if (name === input.meName) {
+      idByName.set(name, current.meId)
+      continue
+    }
+    const person = { id: newId('p'), name }
+    created.push(person)
+    idByName.set(name, person.id)
+  }
+
+  const group: Group = {
+    id: newId('g'),
+    name: input.name.trim() || 'Imported group',
+    currency: input.currency,
+    memberIds: input.people.map((name) => idByName.get(name)!),
+    createdAt: new Date().toISOString(),
+    simplify: true,
+  }
+
+  const expenses: Expense[] = input.rows.map((row) => ({
+    id: newId('e'),
+    groupId: group.id,
+    description: row.description,
+    category: row.category,
+    occurredOn: row.date,
+    splitMode: 'equal',
+    payers: row.payers.map((p) => ({
+      personId: idByName.get(p.name)!,
+      minor: p.minor.toString(),
+    })),
+    shares: row.shares.map((s) => ({
+      personId: idByName.get(s.name)!,
+      minor: s.minor.toString(),
+    })),
+    createdAt: new Date().toISOString(),
+  }))
+
+  commit({
+    ...current,
+    people: [...current.people, ...created],
+    groups: [...current.groups, group],
+    expenses: [...expenses.reverse(), ...current.expenses],
+  })
+
+  return group
+}
+
+/**
  * A worked example, so an empty app can be judged on something.
  *
  * Real amounts, an uneven split, a bill somebody else paid and one in another

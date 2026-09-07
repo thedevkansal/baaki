@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ImportSheet } from '@/components/app/import-sheet'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
 import { Avatar, Field, inputClass } from '@/components/ui/field'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ export default function GroupsPage() {
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('INR')
   const [others, setOthers] = useState('')
+  const [importing, setImporting] = useState(false)
 
   const me = state.people.find((p) => p.id === state.meId)
   const overall = summaries.reduce((acc, s) => add(acc, s.yourNet), zero('INR'))
@@ -49,9 +51,14 @@ export default function GroupsPage() {
           </p>
           <h1 className="mt-1 font-display text-3xl tracking-[-0.03em]">Your groups</h1>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
-          New group
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setImporting(true)}>
+            Import
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
+            New group
+          </Button>
+        </div>
       </div>
 
       {summaries.length > 0 && sameCurrency && (
@@ -120,6 +127,7 @@ export default function GroupsPage() {
             <Button onClick={() => router.push(`/app/g/${seedSampleGroup().id}`)}>
               Try a sample trip
             </Button>
+            <Button onClick={() => setImporting(true)}>Import from Splitwise</Button>
           </div>
           <p className="mt-4 text-xs text-muted">
             The sample is a real group with real bills. Delete it whenever you like.
@@ -146,6 +154,10 @@ export default function GroupsPage() {
           Accounts and sync are next.
         </p>
       </section>
+
+      {importing && (
+        <ImportSheet open onOpenChange={setImporting} myName={me?.name ?? 'You'} />
+      )}
 
       <Sheet
         open={creating}
