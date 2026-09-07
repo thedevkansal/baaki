@@ -1,6 +1,6 @@
 # Baaki
 
-**बाकी** — _what's remaining, what's outstanding._
+**बाकी** _(baaki)_: what's remaining, what's outstanding.
 
 _kitna baaki hai?_ Split any bill, any way, with anyone. Settle up in one tap. Every feature free.
 
@@ -29,16 +29,20 @@ Baaki charges for none of that. It also does the two things their own [feedback 
 
 Storage is currently the browser: one device, no account, no sync. The Postgres layer underneath is built and tested but not yet wired to the UI, because that needs accounts first.
 
-| | |
-|---|---|
-| Groups | Create, rename, delete. Add people **by name alone** — no email, no phone, no invite to accept |
-| Bills | Calculator in the amount field (`450+120*2`), categories, dates, several payers on one bill |
-| Splits | Equally, exact amounts, percentages, shares, plus-or-minus |
-| Currency | Any supported currency per bill; the rate is saved with it and never re-applied |
-| Settling | UPI deep link by device, QR on desktop, two-sided confirmation |
-| Charts | Where the money went, who has been carrying it |
-| Search | Across descriptions, categories and who paid |
-| Export | CSV with a column per person |
+|             |                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| Groups      | Create, rename, delete. Add people **by name alone**: no email, no phone, no invite to accept |
+| Bills       | Calculator in the amount field (`450+120*2`), categories, dates, several payers on one bill   |
+| Splits      | Equally, exact amounts, percentages, shares, plus-or-minus                                    |
+| Currency    | Any supported currency per bill; the rate is saved with it and never re-applied               |
+| Settling    | UPI deep link by device, QR on desktop, two-sided confirmation                                |
+| Charts      | Where the money went, who has been carrying it                                                |
+| Search      | Across bills, people and settled payments                                                     |
+| History     | Bills and settled payments in one list, with undo                                             |
+| Export      | CSV with a column per person                                                                  |
+| Import      | Read a Splitwise group export straight in, balances intact                                    |
+| Repeats     | Weekly or monthly bills, offered when due and never added on their own                        |
+| Installable | Home screen app, opens straight into your groups                                              |
 
 ## Running it
 

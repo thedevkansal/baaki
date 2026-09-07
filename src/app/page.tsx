@@ -103,9 +103,15 @@ export default function LandingPage() {
 
         <section className="border-t border-rule bg-paper-sunken px-6 py-24 sm:py-28">
           <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-8 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="max-w-xl font-display text-[clamp(2rem,4.5vw,3.25rem)] font-semibold leading-[0.95] tracking-[-0.03em]">
-              Stop asking the group chat.
-            </h2>
+            <div className="max-w-xl">
+              <h2 className="font-display text-[clamp(2rem,4.5vw,3.25rem)] font-semibold leading-[0.95] tracking-[-0.03em]">
+                Stop asking the group chat.
+              </h2>
+              <p className="mt-5 leading-relaxed text-muted">
+                Already keeping score somewhere else? Export a group from Splitwise and open
+                the file here. Every balance comes across exactly as they had it.
+              </p>
+            </div>
             <Link
               href="/app"
               className="shrink-0 rounded-full bg-ink px-7 py-3.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
