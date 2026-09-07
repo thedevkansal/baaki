@@ -4,6 +4,8 @@
 
 _kitna baaki hai?_ Split any bill, any way, with anyone. Settle up in one tap. Every feature free.
 
+**[baaki-ten.vercel.app](https://baaki-ten.vercel.app)**
+
 ---
 
 ## Why
