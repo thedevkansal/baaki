@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
 import { netBalances, pairwiseDebts } from '@/lib/ledger/balances'
@@ -105,43 +104,32 @@ export function Hero() {
   )
 
   return (
-    <section className="relative pt-10 pb-24 sm:pt-16">
+    <section className="relative pt-16 pb-20 sm:pt-24">
       <div className="mx-auto w-full max-w-5xl px-6">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
-          Bill splitting, without the paywall
-        </p>
-
-        <h1 className="mt-6 font-display text-[clamp(3rem,11.5vw,9.5rem)] font-semibold leading-[0.86] tracking-[-0.045em]">
+        {/**
+         * The headline sets on one line at desktop and is sized to do it. It
+         * was set in viewport units with a 9.5rem ceiling, which put it at
+         * 165px on a laptop: big enough to wrap, orphaning "hai?" on a line of
+         * its own and leaving the right half of the screen as a hole rather
+         * than a margin. Type this size is a composition, not a volume knob.
+         */}
+        <h1 className="font-display text-[clamp(2.75rem,7.5vw,6.25rem)] font-semibold leading-[0.9] tracking-[-0.04em]">
           kitna <span className="text-pos">baaki</span> hai
           <span className="text-neg">?</span>
         </h1>
 
-        {/* The headline gets the full width; everything under it shares a row,
-            so the right half of the page is not left empty at desktop sizes. */}
-        <div className="mt-9 grid gap-8 border-t border-rule pt-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-12">
-          <p className="max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
-            The question every group chat ends with. Baaki answers it the moment a bill
-            lands, and settles it over UPI in one tap.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/app"
-              className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-paper transition-opacity hover:opacity-90"
-            >
-              Open Baaki
-            </Link>
-            <Link
-              href="#pricing"
-              className="rounded-full border border-rule px-5 py-3 text-sm transition-colors hover:border-ink"
-            >
-              What it costs
-            </Link>
-          </div>
-        </div>
+        {/**
+         * The positioning line used to sit above the headline as a tracked-out
+         * label, which is the third such label on this screen. It says more as
+         * a sentence, and the screen is quieter for having one fewer.
+         */}
+        <p className="mt-7 max-w-[54ch] text-lg leading-relaxed text-muted sm:text-xl">
+          The question every group chat ends with. Baaki answers it the moment a bill
+          lands and settles it over UPI in one tap, with nothing behind a paywall.
+        </p>
 
         <p
-          className="mt-10 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
+          className="mt-12 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
           aria-hidden
         >
           <span className="h-px w-10 bg-rule" />
@@ -154,7 +142,7 @@ export function Hero() {
 
           The axis runs the full width of the viewport - the one thing on this
           page allowed to break the column, because it is the idea. */}
-      <div className="relative mt-16 select-none sm:mt-20">
+      <div className="relative mt-8 select-none sm:mt-10">
         <Ruler className="absolute inset-x-0 top-0" />
 
         <div className="mx-auto w-full max-w-5xl px-6">
