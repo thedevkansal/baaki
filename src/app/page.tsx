@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { AppPreview } from '@/components/marketing/app-preview'
 import { Hero } from '@/components/marketing/hero'
 import { Proof } from '@/components/marketing/proof'
 import { SiteFooter } from '@/components/site-footer'
@@ -26,6 +27,7 @@ export default function LandingPage() {
     <>
       <main className="flex-1">
         <Hero />
+        <AppPreview />
         <Proof />
 
         <section
