@@ -30,6 +30,13 @@
   --neg-wash: color-mix(in oklab, var(--neg) 8%, transparent);
   --focus: var(--ink);
 
+  /**
+   * The dim behind a dialog. Deliberately not derived from ink: ink inverts
+   * between themes, so a scrim built from it lightens the page in dark mode
+   * instead of dimming it.
+   */
+  --scrim: rgb(22 21 26 / 0.3);
+
   /* Paper has tooth. Grain is what stops a flat fill reading as a screenshot. */
   --grain-opacity: 0.035;
 
@@ -58,6 +65,7 @@
     --paper-raised: #1c1922;
     --paper-sunken: #100e15;
     --focus: var(--ink);
+    --scrim: rgb(0 0 0 / 0.6);
     --grain-opacity: 0.05;
   }
 }
@@ -73,6 +81,7 @@
   --paper-raised: #1c1922;
   --paper-sunken: #100e15;
   --focus: var(--ink);
+  --scrim: rgb(0 0 0 / 0.6);
   --grain-opacity: 0.05;
 }
 

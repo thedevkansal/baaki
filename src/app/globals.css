@@ -12,6 +12,7 @@
   --color-neg: var(--neg);
   --color-pos-wash: var(--pos-wash);
   --color-neg-wash: var(--neg-wash);
+  --color-scrim: var(--scrim);
 
   --font-display: var(--font-display);
   --font-sans: var(--font-body);
