@@ -9,6 +9,7 @@ import {
 } from '../store/store'
 import { payloadFor } from './payload'
 import {
+  leaveGroup,
   pullGroup,
   removeExpense,
   removeParticipant,
@@ -103,6 +104,8 @@ export function useSyncHandler() {
             await removeSettlement(event.groupId, event.id)
           } else if (event.kind === 'person-removed') {
             await removeParticipant(event.groupId, event.id)
+          } else if (event.kind === 'group-left') {
+            await leaveGroup(event.groupId)
           } else {
             await pushGroup(event.groupId)
           }

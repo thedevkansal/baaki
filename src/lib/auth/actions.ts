@@ -30,8 +30,13 @@ export async function currentAccount(): Promise<Account> {
     .where(eq(users.id, userId))
     .limit(1)
 
+  /**
+   * Groups, not seats. They are one to one today, but the number is read as
+   * "how much would come back", and counting rows rather than groups is the
+   * kind of thing that quietly starts lying the first time they diverge.
+   */
   const seats = await db
-    .select({ id: participants.id })
+    .selectDistinct({ groupId: participants.groupId })
     .from(participants)
     .where(eq(participants.userId, userId))
 

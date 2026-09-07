@@ -127,7 +127,7 @@ export function SiteHeader() {
            */}
           <Link
             href="/app"
-            className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+            className="whitespace-nowrap rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90"
           >
             Your groups
           </Link>

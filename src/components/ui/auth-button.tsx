@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { Button } from '@/components/ui/button'
 import { supabaseBrowser } from '@/lib/auth/client'
 import { currentAccount, signOut, type Account } from '@/lib/auth/actions'
 
@@ -15,7 +17,26 @@ import { currentAccount, signOut, type Account } from '@/lib/auth/actions'
 export function AuthButton() {
   const [account, setAccount] = useState<Account | null>(null)
   const [busy, setBusy] = useState(false)
-  const [open, setOpen] = useState(false)
+  const pathname = usePathname()
+  /**
+   * The menu is open *for a page*, not open in general.
+   *
+   * A menu that outlives the page it was opened on reads as something stuck to
+   * the screen rather than something you opened. Keying it to the path closes
+   * it on navigation without an effect that writes state during a render.
+   */
+  const [openFor, setOpenFor] = useState<string | null>(null)
+  const open = openFor === pathname
+  const setOpen = (next: boolean) => setOpenFor(next ? pathname : null)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenFor(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
 
   useEffect(() => {
     let live = true
@@ -44,7 +65,7 @@ export function AuthButton() {
           })
           if (error) setBusy(false)
         }}
-        className="rounded-full px-3 py-2 text-sm text-muted transition-colors hover:bg-paper-sunken hover:text-ink disabled:opacity-60"
+        className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-muted transition-colors hover:bg-paper-sunken hover:text-ink disabled:opacity-60"
       >
         {busy ? 'Opening Google…' : 'Sign in'}
       </button>
@@ -57,7 +78,7 @@ export function AuthButton() {
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={`Signed in as ${account.email ?? account.name}`}
         className="flex h-9 w-9 items-center justify-center rounded-full border border-rule text-sm font-medium transition-colors hover:border-ink"
@@ -81,13 +102,10 @@ export function AuthButton() {
                 ? 'No groups attached yet.'
                 : `${account.seats} ${account.seats === 1 ? 'group' : 'groups'} follow this account.`}
             </p>
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="mt-3 text-sm text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-              >
+            <form action={signOut} className="mt-4">
+              <Button size="sm" className="w-full" type="submit">
                 Sign out
-              </button>
+              </Button>
             </form>
           </div>
         </>

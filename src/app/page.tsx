@@ -114,7 +114,7 @@ export default function LandingPage() {
             </div>
             <Link
               href="/app"
-              className="shrink-0 rounded-full bg-ink px-7 py-3.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+              className="inline-flex shrink-0 whitespace-nowrap rounded-full bg-ink px-7 py-3.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
             >
               Start a group
             </Link>

@@ -174,16 +174,39 @@ export default function GroupsPage() {
             placeholder="Your name"
           />
         </div>
-        <input
-          className={`${inputClass} mt-2 font-mono`}
-          value={myVpa}
-          inputMode="email"
-          autoCapitalize="none"
-          spellCheck={false}
-          onChange={(event) => setVpaDraft(event.target.value)}
-          aria-label="Your UPI ID"
-          placeholder="Your UPI ID, so people can pay you"
-        />
+        {/* The name has an avatar beside it; without something here the two
+            fields did not read as a pair. */}
+        <div className="mt-3 flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-rule text-muted"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="6" width="18" height="12" rx="2.5" />
+              <path d="M3 10h18" />
+              <path d="M7 14.5h3" />
+            </svg>
+          </span>
+          <input
+            className={`${inputClass} font-mono`}
+            value={myVpa}
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            onChange={(event) => setVpaDraft(event.target.value)}
+            aria-label="Your UPI ID"
+            placeholder="Your UPI ID"
+          />
+        </div>
         {myVpaLooksWrong && (
           <p className="mt-2 text-xs text-neg">
             That does not look like a UPI ID. Example: dev@okhdfcbank

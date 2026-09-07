@@ -916,3 +916,47 @@ export async function sendNudge(
 
   return { ok: true }
 }
+
+/**
+ * Leave a shared group, or delete it if it is yours to delete.
+ *
+ * Deleting a group on one device used to be silent: the rows stayed in
+ * Postgres with the seat still attached, so an account went on collecting
+ * groups its owner could no longer see. An admin deleting takes the group with
+ * them, since they are the person who made it; anybody else is only leaving,
+ * and leaving must not take everyone else's ledger with it.
+ */
+export async function leaveGroup(
+  localGroupId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isDatabaseConfigured()) return { ok: false }
+
+  const db = getDb()
+  const who = await caller(db)
+  const group = await serverGroup(db, localGroupId)
+  if (!group) return { ok: true }
+
+  const admin = await adminSeat(db, group.id, who)
+  if (admin) {
+    await db.delete(groups).where(eq(groups.id, group.id))
+    return { ok: true }
+  }
+
+  const seat = await seatOf(db, group.id, who)
+  if (!seat) return { ok: true }
+
+  /**
+   * A seat that is on a bill cannot be deleted, and should not be: their share
+   * would be owed by nobody. Unbinding it instead means the ledger still adds
+   * up and the person simply stops being on this device.
+   */
+  try {
+    await db.delete(participants).where(eq(participants.id, seat.id))
+  } catch {
+    await db
+      .update(participants)
+      .set({ deviceId: null, userId: null, claimedAt: null })
+      .where(eq(participants.id, seat.id))
+  }
+  return { ok: true }
+}

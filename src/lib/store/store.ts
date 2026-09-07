@@ -81,6 +81,7 @@ export type SyncEvent =
   | { kind: 'expense-deleted'; groupId: string; id: string }
   | { kind: 'settlement-deleted'; groupId: string; id: string }
   | { kind: 'person-removed'; groupId: string; id: string }
+  | { kind: 'group-left'; groupId: string; id: string }
 
 let syncHandler: ((event: SyncEvent) => void) | null = null
 
@@ -282,6 +283,14 @@ export function updateGroup(groupId: string, patch: Partial<Omit<Group, 'id'>>) 
 
 export function deleteGroup(groupId: string) {
   const current = load()
+  /**
+   * Told to the server before it goes, since after the commit there is nothing
+   * left here that knows the group was ever shared. Without this a group
+   * deleted on a phone lived on in Postgres with its seats still attached to
+   * whoever deleted it, which is why an account could claim more groups than
+   * its owner could see.
+   */
+  synced({ kind: 'group-left', groupId, id: groupId })
   commit({
     ...current,
     groups: current.groups.filter((g) => g.id !== groupId),

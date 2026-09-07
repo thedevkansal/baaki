@@ -151,12 +151,14 @@ export function Hero() {
           * go next, and the live answer below is a demonstration rather than a
           * way in.
           */}
-        <div className="mt-9">
+        {/* Sized against the headline it sits under. At the navigation's
+            14px it read as a footnote rather than the way in. */}
+        <div className="mt-10">
           <Link
             href="/app"
-            className="inline-flex rounded-full bg-ink px-6 py-3.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+            className="inline-flex whitespace-nowrap rounded-full bg-ink px-8 py-4 text-base font-semibold text-paper transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:opacity-95 active:translate-y-0"
           >
-            Try Baaki, free
+            Try Baaki for free
           </Link>
         </div>
 
