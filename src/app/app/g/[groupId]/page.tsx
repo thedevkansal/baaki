@@ -321,17 +321,30 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   <Button size="sm" onClick={() => deleteSettlement(s.id)}>
                     {iPaid ? 'Undo' : 'Not yet'}
                   </Button>
+                  {/**
+                   * Only the payee gets the confirm button. Anyone else gets a
+                   * quieter one that says whose word it is being recorded on,
+                   * because pressing somebody's confirmation for them is the
+                   * exact thing the two-sided settle is supposed to prevent.
+                   */}
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant={paidMe ? 'primary' : 'secondary'}
                     onClick={() => setSettlementStatus(s.id, 'confirmed')}
                   >
-                    {paidMe ? 'Confirm' : `${ledger.nameOf(s.toId)} confirmed`}
+                    {paidMe ? 'Confirm' : `${ledger.nameOf(s.toId)} told me`}
                   </Button>
                 </div>
               </li>
             )
           })}
+          {pending.some((s) => s.toId !== state.meId) && (
+            <li className="px-1 text-xs leading-relaxed text-muted">
+              This device keeps the book for the whole group, so a payment to
+              someone else can only move once you record that they said it
+              landed. When they have their own copy of the group, only they can.
+            </li>
+          )}
         </ul>
       )}
 

@@ -34,6 +34,14 @@ export function GroupSettingsSheet({
 
   const confirmedSettlements = settlements.filter((s) => s.status === 'confirmed').length
 
+  /**
+   * The name is the only thing here that waits for the footer. Everything else
+   * on this sheet takes effect on the spot, so a footer that sits disabled
+   * whenever the name is untouched reads as a broken button rather than as
+   * nothing-to-save. It closes the sheet instead, and says which it is doing.
+   */
+  const renamed = name.trim() !== '' && name.trim() !== group.name
+
   const download = () => {
     const csv = buildGroupCsv({
       groupName: group.name,
@@ -62,13 +70,12 @@ export function GroupSettingsSheet({
         <Button
           variant="primary"
           className="w-full"
-          disabled={!name.trim() || name.trim() === group.name}
           onClick={() => {
-            updateGroup(group.id, { name: name.trim() })
+            if (renamed) updateGroup(group.id, { name: name.trim() })
             onOpenChange(false)
           }}
         >
-          Save changes
+          {renamed ? 'Save changes' : 'Done'}
         </Button>
       }
     >

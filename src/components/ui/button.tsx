@@ -11,6 +11,15 @@ const VARIANTS: Record<Variant, string> = {
   danger: 'border border-neg text-neg hover:bg-neg hover:text-paper',
 }
 
+/**
+ * A disabled button has to stop looking like a button you can press. Opacity
+ * alone does not do that: ink inverts, so a dimmed solid pill on a dark ground
+ * still reads as a bright filled control, and the only way to find out it is
+ * dead is to click it. So the fill is dropped entirely.
+ */
+const DISABLED =
+  'disabled:pointer-events-none disabled:border disabled:border-rule disabled:bg-transparent disabled:text-muted disabled:opacity-70'
+
 const SIZES: Record<Size, string> = {
   sm: 'h-9 px-3.5 text-sm',
   md: 'h-11 px-5 text-sm',
@@ -34,8 +43,9 @@ export function Button({
   return (
     <Component
       className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium transition-colors disabled:pointer-events-none disabled:opacity-40',
+        'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium transition-colors',
         VARIANTS[variant],
+        DISABLED,
         SIZES[size],
         className,
       )}
