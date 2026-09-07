@@ -104,16 +104,25 @@ export function Hero() {
   )
 
   return (
-    <section className="relative pt-16 pb-20 sm:pt-24">
-      <div className="mx-auto w-full max-w-5xl px-6">
+    <section className="relative pb-20">
+      {/**
+       * The question owns the first screen, and the answer starts under it.
+       *
+       * A fixed margin cannot promise that: on a 900px laptop the amount was
+       * peeking in at 658px, which gives away the answer before the question
+       * has landed. Sizing this block against the viewport instead means the
+       * axis begins below the fold at any height, and scrolling one notch is
+       * what answers the question.
+       */}
+      <div className="mx-auto flex min-h-[calc(100svh-4.5rem)] w-full max-w-6xl flex-col justify-center px-6 py-16">
         {/**
-         * The headline sets on one line at desktop and is sized to do it. It
-         * was set in viewport units with a 9.5rem ceiling, which put it at
-         * 165px on a laptop: big enough to wrap, orphaning "hai?" on a line of
-         * its own and leaving the right half of the screen as a hole rather
-         * than a margin. Type this size is a composition, not a volume knob.
+         * The question, at the size it deserves: it is the product's whole
+         * pitch, so it gets the screen. The trick is giving it the width to set
+         * on one line rather than shrinking it. It used to sit in a 1024px
+         * column at 165px, which needs about 1320px, so it wrapped and left
+         * "hai?" orphaned. Every other section on this page is already 6xl.
          */}
-        <h1 className="font-display text-[clamp(2.75rem,7.5vw,6.25rem)] font-semibold leading-[0.9] tracking-[-0.04em]">
+        <h1 className="font-display text-[clamp(2.75rem,9.5vw,8.5rem)] font-semibold leading-[0.88] tracking-[-0.045em]">
           kitna <span className="text-pos">baaki</span> hai
           <span className="text-neg">?</span>
         </h1>
@@ -129,7 +138,7 @@ export function Hero() {
         </p>
 
         <p
-          className="mt-12 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
+          className="mt-14 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
           aria-hidden
         >
           <span className="h-px w-10 bg-rule" />
@@ -142,10 +151,10 @@ export function Hero() {
 
           The axis runs the full width of the viewport - the one thing on this
           page allowed to break the column, because it is the idea. */}
-      <div className="relative mt-8 select-none sm:mt-10">
+      <div className="relative select-none">
         <Ruler className="absolute inset-x-0 top-0" />
 
-        <div className="mx-auto w-full max-w-5xl px-6">
+        <div className="mx-auto w-full max-w-6xl px-6">
           <div className="relative -mt-px flex flex-col items-center pt-10">
             <AnimatedAmount value={yourNet} />
             <p
@@ -200,7 +209,7 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="mx-auto mt-14 w-full max-w-5xl px-6">
+      <div className="mx-auto mt-14 w-full max-w-6xl px-6">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
           Try it, add a bill
         </p>
