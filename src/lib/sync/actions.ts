@@ -1,9 +1,11 @@
 'use server'
 
-import { randomBytes, randomUUID } from 'node:crypto'
-import { cookies, headers } from 'next/headers'
+import { randomBytes } from 'node:crypto'
+import { headers } from 'next/headers'
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { getDb, isDatabaseConfigured } from '@/db/client'
+import { deviceId } from '@/lib/auth/device'
+import { callerUserId, seatMatches, type Caller } from '@/lib/auth/identity'
 import {
   expensePayers,
   expenseShares,
@@ -15,44 +17,19 @@ import {
 } from '@/db/schema'
 import type { GroupPayload, JoinLink, Nudge } from './payload'
 
-const DEVICE_COOKIE = 'baaki-device'
-
 type Db = ReturnType<typeof getDb>
 
 /**
- * Who this browser is, as far as the server is concerned.
+ * Who is asking, in both forms at once.
  *
- * There are no accounts yet, so a device is the whole of identity: an opaque
- * random id the browser keeps and the server compares. Set the first time a
- * device shares or joins, never derived from anything about the person, and
- * meaningless outside this app.
+ * Resolved per request rather than per call site, so every check below asks the
+ * same question. A seat answers to the device that claimed it and, once it has
+ * been adopted, to the account that owns it from any device.
  */
-async function deviceId(): Promise<string> {
-  const jar = await cookies()
-  const existing = jar.get(DEVICE_COOKIE)?.value
-  if (existing) return existing
-
-  const fresh = randomUUID()
-  jar.set(DEVICE_COOKIE, fresh, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 24 * 365 * 5,
-    path: '/',
-  })
-  return fresh
+async function caller(db: Db): Promise<Caller> {
+  return { deviceId: await deviceId(), userId: await callerUserId(db) }
 }
 
-/**
- * Where a join link should point.
- *
- * The request wins over the configured origin, not the other way round. A link
- * is handed to somebody on another device, so the one address guaranteed to
- * reach this server is the one the browser just used: localhost only when the
- * page really was opened on localhost, the preview domain on a preview
- * deployment, the real domain in production. A configured origin is the
- * fallback for the case where there is no request to learn from.
- */
 async function origin(): Promise<string> {
   const h = await headers()
   const host = h.get('x-forwarded-host') ?? h.get('host')
@@ -93,7 +70,8 @@ export async function shareGroup(
   }
 
   const db = getDb()
-  const me = await deviceId()
+  const who = await caller(db)
+  const me = who.deviceId
   const base = await origin()
   const { group } = payload
 
@@ -156,7 +134,12 @@ export async function shareGroup(
             // The sharing device takes its own seat on the spot; everybody
             // else arrives through the group's invite link.
             ...(person.id === meLocalId
-              ? { claimedAt: new Date(), deviceId: me, role: 'admin' as const }
+              ? {
+                  claimedAt: new Date(),
+                  deviceId: me,
+                  userId: who.userId,
+                  role: 'admin' as const,
+                }
               : {}),
           })
           .onConflictDoNothing()
@@ -172,7 +155,7 @@ export async function shareGroup(
             and(
               eq(participants.groupId, serverGroupId),
               eq(participants.localId, meLocalId),
-              eq(participants.deviceId, me),
+              seatMatches(who),
             ),
           )
       }
@@ -185,7 +168,7 @@ export async function shareGroup(
       const [seat] = await tx
         .select({ role: participants.role })
         .from(participants)
-        .where(and(eq(participants.groupId, serverGroupId), eq(participants.deviceId, me)))
+        .where(and(eq(participants.groupId, serverGroupId), seatMatches(who)))
         .limit(1)
 
       if (seat?.role === 'admin') {
@@ -427,7 +410,8 @@ export async function joinGroup(
     .limit(1)
   if (!group) return { ok: false, message: 'That link is not valid.' }
 
-  const held = await seatOf(db, group.id, me)
+  const mine = await caller(db)
+  const held = await seatOf(db, group.id, mine)
 
   if (held) {
     // Already in. Let them correct their own name and VPA, nothing else.
@@ -443,7 +427,15 @@ export async function joinGroup(
      */
     const taken = await db
       .update(participants)
-      .set({ displayName: name, vpa, claimedAt: new Date(), deviceId: me })
+      .set({
+        displayName: name,
+        vpa,
+        claimedAt: new Date(),
+        deviceId: me,
+        // Recorded now rather than at the next sign-in, so a seat taken while
+        // already signed in belongs to the account from the moment it exists.
+        userId: mine.userId,
+      })
       .where(
         and(
           eq(participants.groupId, group.id),
@@ -464,11 +456,12 @@ export async function joinGroup(
       vpa,
       claimedAt: new Date(),
       deviceId: me,
+      userId: mine.userId,
     })
   }
 
-  const seat = await seatOf(db, group.id, me)
-  const payload = await readGroup(db, group.id, me)
+  const seat = await seatOf(db, group.id, mine)
+  const payload = await readGroup(db, group.id, mine)
   if (!payload || !seat) return { ok: false, message: 'That group could not be read.' }
   return { ok: true, payload, meId: seat.localId }
 }
@@ -478,7 +471,7 @@ export async function pullGroup(localGroupId: string): Promise<PullResult> {
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
+  const who = await caller(db)
 
   const [group] = await db
     .select({ id: groups.id })
@@ -490,10 +483,10 @@ export async function pullGroup(localGroupId: string): Promise<PullResult> {
   const [seat] = await db
     .select({ localId: participants.localId })
     .from(participants)
-    .where(and(eq(participants.groupId, group.id), eq(participants.deviceId, me)))
+    .where(and(eq(participants.groupId, group.id), seatMatches(who)))
     .limit(1)
 
-  const payload = await readGroup(db, group.id, me)
+  const payload = await readGroup(db, group.id, who)
   if (!payload) return { ok: false, message: 'That group could not be read.' }
   return { ok: true, payload, meId: seat?.localId }
 }
@@ -502,7 +495,7 @@ export async function pullGroup(localGroupId: string): Promise<PullResult> {
 async function readGroup(
   db: Db,
   serverGroupId: string,
-  device?: string,
+  who?: Caller,
 ): Promise<GroupPayload | null> {
   const [group] = await db.select().from(groups).where(eq(groups.id, serverGroupId)).limit(1)
   if (!group) return null
@@ -529,9 +522,14 @@ async function readGroup(
     .from(settlements)
     .where(and(eq(settlements.groupId, serverGroupId), isNull(settlements.deletedAt)))
 
+  const isMine = (seat: { deviceId: string | null; userId: string | null }) =>
+    Boolean(who) &&
+    (seat.deviceId === who!.deviceId ||
+      (who!.userId !== null && seat.userId === who!.userId))
+
   const asks: Nudge[] = []
-  if (device) {
-    const mySeat = seats.find((s) => s.deviceId === device)
+  if (who) {
+    const mySeat = seats.find(isMine)
     if (mySeat) {
       const rows = await db
         .select({
@@ -571,9 +569,7 @@ async function readGroup(
       simplify: group.simplify,
       memberIds: seats.map((s) => s.localId),
       createdAt: group.createdAt.toISOString(),
-      owner:
-        device !== undefined &&
-        seats.some((s) => s.deviceId === device && s.role === 'admin'),
+      owner: seats.some((s) => isMine(s) && s.role === 'admin'),
       claimed: seats.filter((s) => s.claimedAt).map((s) => s.localId),
       admins: seats.filter((s) => s.role === 'admin').map((s) => s.localId),
     },
@@ -617,11 +613,11 @@ async function readGroup(
 }
 
 /** The seat this device holds in a group, or null if it holds none. */
-async function seatOf(db: Db, serverGroupId: string, device: string) {
+async function seatOf(db: Db, serverGroupId: string, who: Caller) {
   const [seat] = await db
     .select({ id: participants.id, localId: participants.localId })
     .from(participants)
-    .where(and(eq(participants.groupId, serverGroupId), eq(participants.deviceId, device)))
+    .where(and(eq(participants.groupId, serverGroupId), seatMatches(who)))
     .limit(1)
   return seat ?? null
 }
@@ -679,11 +675,10 @@ export async function answerSettlement(
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
   const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
 
-  const seat = await seatOf(db, group.id, me)
+  const seat = await seatOf(db, group.id, await caller(db))
   if (!seat) return { ok: false, message: 'This device is not in that group.' }
 
   const [row] = await db
@@ -721,11 +716,10 @@ export async function reproposeSettlement(
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
   const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
 
-  const seat = await seatOf(db, group.id, me)
+  const seat = await seatOf(db, group.id, await caller(db))
   if (!seat) return { ok: false, message: 'This device is not in that group.' }
 
   const [row] = await db
@@ -767,12 +761,11 @@ export async function removeParticipant(
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
 
   const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
 
-  const seat = await adminSeat(db, group.id, me)
+  const seat = await adminSeat(db, group.id, await caller(db))
   if (!seat) return { ok: false, message: 'Only an admin of this group can remove someone.' }
   if (seat.localId === personLocalId) {
     return { ok: false, message: 'You cannot remove yourself from your own group.' }
@@ -796,14 +789,14 @@ export async function removeParticipant(
 }
 
 /** This device's seat in a group, but only if it is an admin one. */
-async function adminSeat(db: Db, serverGroupId: string, device: string) {
+async function adminSeat(db: Db, serverGroupId: string, who: Caller) {
   const [seat] = await db
     .select({ id: participants.id, localId: participants.localId })
     .from(participants)
     .where(
       and(
         eq(participants.groupId, serverGroupId),
-        eq(participants.deviceId, device),
+        seatMatches(who),
         eq(participants.role, 'admin'),
       ),
     )
@@ -825,11 +818,10 @@ export async function makeAdmin(
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
   const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
 
-  const seat = await adminSeat(db, group.id, me)
+  const seat = await adminSeat(db, group.id, await caller(db))
   if (!seat) return { ok: false, message: 'Only an admin can make somebody else one.' }
 
   const changed = await db
@@ -857,11 +849,10 @@ export async function sendNudge(
   if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
 
   const db = getDb()
-  const me = await deviceId()
   const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
 
-  const from = await seatOf(db, group.id, me)
+  const from = await seatOf(db, group.id, await caller(db))
   if (!from) return { ok: false, message: 'This device is not in that group.' }
 
   const [to] = await db

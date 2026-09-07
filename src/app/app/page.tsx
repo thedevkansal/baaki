@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AccountCard } from '@/components/app/account-card'
 import { ImportSheet } from '@/components/app/import-sheet'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
 import { Avatar, Field, inputClass } from '@/components/ui/field'
@@ -205,6 +206,8 @@ export default function GroupsPage() {
           keeps their own copy and balances stay in step.
         </p>
       </section>
+
+      <AccountCard />
 
       {importing && (
         <ImportSheet open onOpenChange={setImporting} myName={me?.name ?? 'You'} />
