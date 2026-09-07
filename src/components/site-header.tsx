@@ -84,10 +84,16 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 transition-all duration-200',
+        /**
+         * The bar always sits on its own surface. Transparent over the hero
+         * meant it read as part of the page rather than as furniture on top of
+         * it, and paper-raised is a different shade from the ground in both
+         * themes, so the edge is visible without a hard line doing the work.
+         */
+        'sticky top-0 z-50 border-b backdrop-blur-xl transition-colors duration-200',
         scrolled || inApp
-          ? 'border-b border-rule bg-paper/80 backdrop-blur-xl'
-          : 'border-b border-transparent bg-transparent',
+          ? 'border-rule bg-paper-raised/90'
+          : 'border-rule/60 bg-paper-raised/70',
       )}
     >
       <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-6 py-4">

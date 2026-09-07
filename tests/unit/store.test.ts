@@ -328,7 +328,7 @@ describe('what reaches the server', () => {
 
   it('says nothing about a group that is not shared', () => {
     const me = getState().meId
-    const group = createGroup('Flat', INR, [me])
+    createGroup('Flat', INR, [me])
     const seen = recordEvents()
     renamePerson(me, 'Dev')
     setSyncHandler(null)

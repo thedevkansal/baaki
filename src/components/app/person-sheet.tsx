@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { money, type Money } from '@/lib/money'
 import { removePersonFromGroup, renamePerson, setPersonVpa } from '@/lib/store/store'
+import { makeAdmin } from '@/lib/sync/actions'
 import { isValidVpa } from '@/lib/upi/link'
 import type { Expense, Group, Person } from '@/lib/store/types'
 
@@ -31,6 +32,7 @@ export function PersonSheet({
   onSettle,
   groupId,
   group,
+  settledWith,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -47,6 +49,8 @@ export function PersonSheet({
   onSettle?: () => void
   /** Needed to know what this device is allowed to change about them. */
   group: Group
+  /** Whether any payment in this group involves them. */
+  settledWith: boolean
   groupId: string
 }) {
   const [name, setName] = useState(person.name)
@@ -70,11 +74,20 @@ export function PersonSheet({
   const canRename = isMe || (isOwner && unclaimed)
   const canEditVpa = isMe
   const canRemove = isOwner
+  const isTheirAdmin = (group.admins ?? []).includes(person.id)
+  const [promoting, setPromoting] = useState(false)
   const shared = expenses.filter(
     (expense) =>
       expense.shares.some((s) => s.personId === person.id && BigInt(s.minor) !== 0n) ||
       expense.payers.some((p) => p.personId === person.id),
   )
+
+  /**
+   * Everything that would be orphaned by removing them: bills and payments.
+   * The old gate looked only at bills, so somebody who had only ever settled up
+   * was offered a button the store then refused.
+   */
+  const onSomething = shared.length > 0 || settledWith
 
   const theyPaid = shared.reduce(
     (acc, e) =>
@@ -280,26 +293,62 @@ export function PersonSheet({
         {!isMe && canRemove && (
           <div className="rounded-xl border border-rule px-4 py-4">
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-              Remove
+              {group.shared && !isTheirAdmin ? 'Admin and removal' : 'Remove'}
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              {shared.length === 0
-                ? 'Added by mistake? They can be taken out while they are not on anything.'
-                : 'They are on bills here, so removing them would leave a balance owed to nobody.'}
-            </p>
-            <Button
-              size="sm"
-              variant="danger"
-              className="mt-3"
-              disabled={shared.length > 0}
-              onClick={() => {
-                const result = removePersonFromGroup(groupId, person.id)
-                if (result.removed) onOpenChange(false)
-                else setRemoveError(result.reason ?? null)
-              }}
-            >
-              Remove from group
-            </Button>
+
+            {group.shared && !isTheirAdmin && (
+              <>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  An admin can invite, remove people and fix names nobody has claimed.
+                  Nobody can be demoted, so a group is never left without one.
+                </p>
+                <Button
+                  size="sm"
+                  className="mt-3"
+                  disabled={promoting}
+                  onClick={async () => {
+                    setPromoting(true)
+                    const result = await makeAdmin(groupId, person.id)
+                    setPromoting(false)
+                    setRemoveError(result.ok ? null : (result.message ?? null))
+                  }}
+                >
+                  {promoting ? 'Making them an admin…' : `Make ${person.name} an admin`}
+                </Button>
+              </>
+            )}
+
+            {/**
+              * A button that cannot do anything is worse than no button: it
+              * reads as broken rather than as refused. When somebody is on a
+              * bill, the thing standing in the way is the bill, so say that and
+              * say how many.
+              */}
+            {onSomething ? (
+              <p className="mt-4 text-xs leading-relaxed text-muted">
+                {person.name} is on {shared.length} {shared.length === 1 ? 'bill' : 'bills'}{' '}
+                here, so they cannot be taken out: their share would be owed by nobody.
+                Take them off those bills first, or delete the bills.
+              </p>
+            ) : (
+              <>
+                <p className="mt-4 text-xs leading-relaxed text-muted">
+                  They are not on anything yet, so they can be taken out cleanly.
+                </p>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="mt-3"
+                  onClick={() => {
+                    const result = removePersonFromGroup(groupId, person.id)
+                    if (result.removed) onOpenChange(false)
+                    else setRemoveError(result.reason ?? null)
+                  }}
+                >
+                  Remove from group
+                </Button>
+              </>
+            )}
             {removeError && <p className="mt-2 text-xs text-neg">{removeError}</p>}
           </div>
         )}

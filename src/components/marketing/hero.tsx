@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
 import { netBalances, pairwiseDebts } from '@/lib/ledger/balances'
@@ -115,13 +116,32 @@ export function Hero() {
           <span className="text-neg">?</span>
         </h1>
 
-        <p className="mt-8 max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
-          The question every group chat ends with. Baaki answers it the moment a bill lands,
-          and settles it over UPI in one tap.
-        </p>
+        {/* The headline gets the full width; everything under it shares a row,
+            so the right half of the page is not left empty at desktop sizes. */}
+        <div className="mt-9 grid gap-8 border-t border-rule pt-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-12">
+          <p className="max-w-xl text-lg leading-relaxed text-muted sm:text-xl">
+            The question every group chat ends with. Baaki answers it the moment a bill
+            lands, and settles it over UPI in one tap.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/app"
+              className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+            >
+              Open Baaki
+            </Link>
+            <Link
+              href="#pricing"
+              className="rounded-full border border-rule px-5 py-3 text-sm transition-colors hover:border-ink"
+            >
+              What it costs
+            </Link>
+          </div>
+        </div>
 
         <p
-          className="mt-14 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
+          className="mt-10 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"
           aria-hidden
         >
           <span className="h-px w-10 bg-rule" />
@@ -134,7 +154,7 @@ export function Hero() {
 
           The axis runs the full width of the viewport - the one thing on this
           page allowed to break the column, because it is the idea. */}
-      <div className="relative mt-36 select-none sm:mt-48">
+      <div className="relative mt-16 select-none sm:mt-20">
         <Ruler className="absolute inset-x-0 top-0" />
 
         <div className="mx-auto w-full max-w-5xl px-6">
@@ -192,7 +212,7 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="mx-auto mt-16 w-full max-w-5xl px-6">
+      <div className="mx-auto mt-14 w-full max-w-5xl px-6">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
           Try it, add a bill
         </p>

@@ -663,6 +663,9 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
               nameOf={ledger.nameOf}
               groupId={groupId}
             group={group}
+            settledWith={settlements.some(
+              (s) => s.fromId === viewing || s.toId === viewing,
+            )}
               onSettle={
                 pair && pair.amount.minor < 0n
                   ? () => {
