@@ -42,15 +42,26 @@ async function deviceId(): Promise<string> {
   return fresh
 }
 
+/**
+ * Where a join link should point.
+ *
+ * The request wins over the configured origin, not the other way round. A link
+ * is handed to somebody on another device, so the one address guaranteed to
+ * reach this server is the one the browser just used: localhost only when the
+ * page really was opened on localhost, the preview domain on a preview
+ * deployment, the real domain in production. A configured origin is the
+ * fallback for the case where there is no request to learn from.
+ */
 async function origin(): Promise<string> {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL
-  if (configured) return configured.replace(/\/$/, '')
-
   const h = await headers()
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
-  const proto =
-    h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
-  return `${proto}://${host}`
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  if (host) {
+    const proto =
+      h.get('x-forwarded-proto') ??
+      (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https')
+    return `${proto}://${host}`
+  }
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 }
 
 /** 24 bytes, url-safe. Long enough that guessing one is not a strategy. */
