@@ -22,7 +22,7 @@ import {
 import { personIdOf, useAppState, useGroupLedger } from '@/lib/store/use-store'
 import type { Person } from '@/lib/store/types'
 
-type Tab = 'balances' | 'expenses' | 'charts'
+type Tab = 'balances' | 'activity' | 'charts'
 
 export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const { groupId } = use(params)
@@ -60,22 +60,55 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const pending = settlements.filter((s) => s.status === 'proposed')
   const focusedPerson = yourSplit.find((s) => s.person.id === focused)
 
-  // Searching your own history is a Pro feature over there. It matches the
-  // description, the category and whoever paid, because those are the three
-  // things people actually remember about a bill.
+  /**
+   * Bills and settled payments in one list, newest first.
+   *
+   * A confirmed settlement used to vanish once it moved the balances, which
+   * left no answer to "did I already pay Priya?" and no way back from
+   * confirming one by mistake.
+   */
   const needle = query.trim().toLowerCase()
-  const visibleExpenses = needle
-    ? expenses.filter((expense) =>
-        [
-          expense.description,
-          expense.category,
-          ...expense.payers.map((p) => ledger.nameOf(p.personId)),
+
+  type Item =
+    | { kind: 'expense'; at: string; expense: (typeof expenses)[number] }
+    | { kind: 'settlement'; at: string; settlement: (typeof settlements)[number] }
+
+  const activity: Item[] = [
+    ...expenses.map((expense) => ({
+      kind: 'expense' as const,
+      at: expense.occurredOn,
+      expense,
+    })),
+    ...settlements
+      .filter((s) => s.status === 'confirmed')
+      .map((settlement) => ({
+        kind: 'settlement' as const,
+        at: settlement.createdAt.slice(0, 10),
+        settlement,
+      })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
+
+  const searchText = (item: Item) =>
+    (item.kind === 'expense'
+      ? [
+          item.expense.description,
+          item.expense.category,
+          ...item.expense.payers.map((p) => ledger.nameOf(p.personId)),
         ]
-          .join(' ')
-          .toLowerCase()
-          .includes(needle),
-      )
-    : expenses
+      : [
+          // Words people actually type when hunting for a payment.
+          'settlement payment paid settled',
+          ledger.nameOf(item.settlement.fromId),
+          ledger.nameOf(item.settlement.toId),
+          item.settlement.method,
+        ]
+    )
+      .join(' ')
+      .toLowerCase()
+
+  const visibleActivity = needle
+    ? activity.filter((item) => searchText(item).includes(needle))
+    : activity
   const myTransfers = ledger.transfers
     .map((t, index) => ({ t, index }))
     .filter(({ t }) => personIdOf(t.from) === state.meId)
@@ -247,7 +280,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
         onChange={setTab}
         options={[
           { value: 'balances', label: 'People' },
-          { value: 'expenses', label: `Expenses (${expenses.length})` },
+          { value: 'activity', label: `Activity (${activity.length})` },
           { value: 'charts', label: 'Charts' },
         ]}
       />
@@ -292,18 +325,66 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           </>
         )}
 
-        {tab === 'expenses' && (
+        {tab === 'activity' && (
           <>
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search bills, categories, who paid"
-              aria-label="Search expenses"
+              placeholder="Search bills, people, payments"
+              aria-label="Search this group"
               className={cn(inputClass, 'mb-3')}
             />
             <ul className="space-y-2">
-              {visibleExpenses.map((expense, index) => {
+              {visibleActivity.map((item, index) => {
+                if (item.kind === 'settlement') {
+                  const { settlement } = item
+                  const iPaid = settlement.fromId === state.meId
+                  return (
+                    <li
+                      key={settlement.id}
+                      className="rise group flex items-center gap-2 rounded-xl border border-rule bg-paper-sunken py-3 pl-4 pr-2"
+                      style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {iPaid
+                            ? `You paid ${ledger.nameOf(settlement.toId)}`
+                            : `${ledger.nameOf(settlement.fromId)} paid ${
+                                settlement.toId === state.meId
+                                  ? 'you'
+                                  : ledger.nameOf(settlement.toId)
+                              }`}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted">
+                          Settled · {settlement.method} · {item.at}
+                        </p>
+                      </div>
+                      <p className="shrink-0 font-mono text-sm tabular-nums text-muted">
+                        {formatMoney(money(BigInt(settlement.minor), currency))}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => deleteSettlement(settlement.id)}
+                        aria-label="Undo this settlement"
+                        className="shrink-0 rounded-full p-1.5 text-muted opacity-0 transition-opacity hover:text-neg focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+                          <path
+                            d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </li>
+                  )
+                }
+
+                const { expense } = item
                 const total = expense.shares.reduce((acc, s) => acc + BigInt(s.minor), 0n)
                 const paidBy = expense.payers
                   .map((p) => ledger.nameOf(p.personId))
@@ -366,9 +447,9 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
                   </li>
                 )
               })}
-              {visibleExpenses.length === 0 && (
+              {visibleActivity.length === 0 && (
                 <li className="rounded-xl border border-dashed border-rule px-6 py-12 text-center text-sm text-muted">
-                  {expenses.length === 0
+                  {activity.length === 0
                     ? 'Add the first expense.'
                     : `Nothing matches "${query.trim()}".`}
                 </li>
