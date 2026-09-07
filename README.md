@@ -14,7 +14,7 @@ Splitwise puts unlimited expenses, currency conversion, charts, receipt scanning
 
 Baaki charges for none of it, and does the two things their own [feedback board](https://feedback.splitwise.com/forums/162446-general/filters/top) has asked for for years:
 
-- **Settle over UPI without leaving the app.** Payee, amount and note arrive prefilled. Verified on a real Android phone. (458 votes, unbuilt there.)
+- **Settle over UPI without leaving the app.** Payee, amount and note arrive prefilled. Verified on real phones: the chooser opens with the amount already in it. (458 votes, unbuilt there.)
 - **Explain a simplified debt.** Tap "you owe Rahul ₹340" and see the bills it replaced, instead of owing money to someone you never spent anything with.
 
 ## Principles
@@ -32,6 +32,8 @@ Baaki charges for none of it, and does the two things their own [feedback board]
 ## What works
 
 Local first. Groups live in the browser with no account and no network. Sharing syncs to Postgres so others can join by link, typing their own name and UPI ID. Google sign in is optional and attaches the seats this browser already holds to a person, so a cleared cache isn't the end of your data.
+
+The whole loop runs on two phones today: make a group, send the link, the other person joins with their own name and UPI ID, split a bill, settle it over UPI, confirm from the other side.
 
 Bills take several payers, a calculator in the amount field (`450+120*2`), any currency at the rate saved with it, and split equally, by exact amounts, percentages, shares or plus-or-minus. Plus charts, search, history with undo, CSV export, Splitwise import, recurring bills, and installable to the home screen.
 
