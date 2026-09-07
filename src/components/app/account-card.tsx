@@ -79,6 +79,9 @@ export function AccountCard() {
       <Button variant="primary" size="sm" className="mt-4" disabled={busy} onClick={signIn}>
         {busy ? 'Opening Google…' : 'Continue with Google'}
       </Button>
+      <p className="mt-3 text-xs text-muted">
+        Or use <span className="text-ink">Sign in</span> at the top of any page.
+      </p>
     </section>
   )
 }

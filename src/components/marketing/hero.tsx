@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { AnimatedAmount } from '@/components/ui/animated-amount'
 import { netBalances, pairwiseDebts } from '@/lib/ledger/balances'
@@ -143,6 +144,21 @@ export function Hero() {
           The question every group chat ends with. Baaki answers it the moment a bill
           lands, and settles it over UPI in one tap.
         </p>
+
+        {/**
+          * One button, and it says what it costs. Somebody who has read the
+          * headline and the line under it should not have to work out where to
+          * go next, and the live answer below is a demonstration rather than a
+          * way in.
+          */}
+        <div className="mt-9">
+          <Link
+            href="/app"
+            className="inline-flex rounded-full bg-ink px-6 py-3.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+          >
+            Try Baaki, free
+          </Link>
+        </div>
 
         <p
           className="mt-14 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted"

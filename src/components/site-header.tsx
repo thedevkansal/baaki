@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { AuthButton } from '@/components/ui/auth-button'
 import { NudgeBell } from '@/components/ui/nudge-bell'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { cn } from '@/lib/cn'
@@ -119,14 +120,16 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <NudgeBell />
           <ThemeToggle />
+          <AuthButton />
+          {/**
+           * "Open Baaki" made no sense to somebody already on Baaki. The button
+           * goes to the thing it opens, and says so, from every page.
+           */}
           <Link
-            href={inApp ? '/app' : '/app'}
-            className={cn(
-              'rounded-full px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90',
-              'bg-ink text-paper',
-            )}
+            href="/app"
+            className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90"
           >
-            {inApp ? 'Your groups' : 'Open Baaki'}
+            Your groups
           </Link>
         </div>
       </div>

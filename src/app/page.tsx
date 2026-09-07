@@ -116,7 +116,7 @@ export default function LandingPage() {
               href="/app"
               className="shrink-0 rounded-full bg-ink px-7 py-3.5 text-sm font-medium text-paper transition-opacity hover:opacity-90"
             >
-              Open Baaki
+              Start a group
             </Link>
           </div>
         </section>
