@@ -17,7 +17,7 @@ import {
   createGroup,
   seedSampleGroup,
   setMyName,
-  setPersonVpa,
+  updateMyProfile,
 } from '@/lib/store/store'
 import { useAppState, useGroupSummaries } from '@/lib/store/use-store'
 
@@ -193,8 +193,7 @@ export default function GroupsPage() {
           className="mt-3"
           disabled={!profileDirty || !myName.trim() || myVpaLooksWrong}
           onClick={() => {
-            if (myName.trim() !== me?.name) setMyName(myName)
-            if (me && myVpa.trim() !== storedVpa) setPersonVpa(me.id, myVpa)
+            updateMyProfile({ name: myName, vpa: myVpa })
             setNameDraft(null)
             setVpaDraft(null)
           }}

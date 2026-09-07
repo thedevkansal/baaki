@@ -42,8 +42,13 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Baaki',
-    template: '%s · Baaki',
+    default: 'Baaki, kitna baaki hai?',
+    /**
+     * The name first. A browser tab shows about a dozen characters, so
+     * "Your groups · Baaki" truncated to "Your" and the tab said nothing about
+     * which app it was.
+     */
+    template: 'Baaki · %s',
   },
   description:
     'kitna baaki hai? Split any bill, any way, with anyone. Settle up over UPI in one tap. Every feature free.',

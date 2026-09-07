@@ -44,6 +44,8 @@ export function SettleSheet({
   const [typed, setTyped] = useState(theirs)
   const vpa = shared ? theirs : typed
   const [copied, setCopied] = useState(false)
+  const [asked, setAsked] = useState(false)
+  const [showQr, setShowQr] = useState(false)
   const platform = usePlatform()
 
   const route = useMemo(() => {
@@ -105,14 +107,25 @@ export function SettleSheet({
           ) : (
             <div className="rounded-xl border border-rule px-4 py-4">
               <p className="text-sm leading-relaxed">
-                {to.name} has not added a UPI ID yet, so there is nothing to open a
-                payment app with.
+                {to.name} has not added a UPI ID yet.
               </p>
               <p className="mt-2 text-xs leading-relaxed text-muted">
-                Ask them to add it in Baaki. Typing it for them is how money reaches
-                the wrong person, and Baaki cannot see the payment to catch it. You can
-                still pay them any other way and record it below.
+                Only they can add it. Typing it for them is how money reaches the wrong
+                person, and Baaki cannot see the payment to catch it.
               </p>
+              {/* One press, rather than "go and ask them somehow". */}
+              <Button
+                size="sm"
+                className="mt-3"
+                onClick={() => {
+                  void navigator.clipboard.writeText(
+                    `Add your UPI ID in Baaki so I can pay you the ${formatMoney(amount)} for ${groupName}. It is under your name on the groups screen.`,
+                  )
+                  setAsked(true)
+                }}
+              >
+                {asked ? 'Message copied' : 'Copy a message asking them'}
+              </Button>
             </div>
           )
         ) : (
@@ -146,14 +159,14 @@ export function SettleSheet({
         {route && (
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-              {route.kind === 'intent'
-                ? 'Open your UPI app'
-                : route.kind === 'app-picker'
-                  ? 'Pay with'
-                  : 'Scan from your phone'}
+              {route.kind === 'qr' || showQr
+                ? 'Scan to pay'
+                : route.kind === 'intent'
+                  ? 'Open your UPI app'
+                  : 'Pay with'}
             </p>
 
-            {route.kind === 'qr' ? (
+            {route.kind === 'qr' || showQr ? (
               <div className="mt-3 flex flex-col items-center gap-4 rounded-2xl border border-rule bg-paper-raised p-5 sm:flex-row sm:items-start">
                 <div className="w-40 shrink-0 rounded-xl border border-rule p-2 text-ink">
                   <QrCode
@@ -163,8 +176,9 @@ export function SettleSheet({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm leading-relaxed text-muted">
-                    There is no UPI app on a desktop. Scan this with your phone and the
-                    payee, amount and note arrive already filled in.
+                    {route.kind === 'qr'
+                      ? 'There is no UPI app on a desktop. Scan this with your phone and the payee, amount and note arrive already filled in.'
+                      : `Scan it from any other phone. ${to.name}, the amount and the note are already in it.`}
                   </p>
                   <p className="mt-3 font-mono text-sm break-all text-ink">
                     {route.copyVpa}
@@ -185,16 +199,33 @@ export function SettleSheet({
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard?.writeText(route.copyVpa)
-                setCopied(true)
-              }}
-              className="mt-3 text-xs text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-            >
-              {copied ? 'UPI ID copied' : 'Copy the UPI ID instead'}
-            </button>
+            {/**
+              * A QR is not a desktop consolation prize. On a phone it is how
+              * you pay from a second device, or hand the screen to somebody
+              * standing next to you, and it carries the same prefilled payload
+              * as the deep link.
+              */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {route.kind !== 'qr' && (
+                <button
+                  type="button"
+                  onClick={() => setShowQr((current) => !current)}
+                  className="text-xs text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
+                >
+                  {showQr ? 'Open a UPI app instead' : 'Show a QR to scan instead'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(route.copyVpa)
+                  setCopied(true)
+                }}
+                className="text-xs text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
+              >
+                {copied ? 'UPI ID copied' : 'Copy the UPI ID instead'}
+              </button>
+            </div>
           </div>
         )}
 

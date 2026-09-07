@@ -155,6 +155,40 @@ export function setPersonVpa(personId: string, vpa: string) {
   syncedPerson(personId)
 }
 
+/**
+ * Change your own name and UPI ID everywhere you appear.
+ *
+ * Identity is per group, so "you" is the device's own person plus whichever
+ * seat you took in each group you joined. Editing only the device's person
+ * left a UPI ID that updated on this screen and nowhere else, because the seat
+ * you actually hold in a joined group is a different row.
+ */
+export function updateMyProfile(patch: { name?: string; vpa?: string }) {
+  const current = load()
+  const name = patch.name?.trim()
+  const vpa = patch.vpa?.trim()
+
+  const mine = new Set<string>([current.meId])
+  for (const group of current.groups) if (group.meId) mine.add(group.meId)
+
+  commit({
+    ...current,
+    people: current.people.map((person) =>
+      mine.has(person.id)
+        ? {
+            ...person,
+            ...(name !== undefined ? { name: name || 'You' } : {}),
+            ...(vpa !== undefined ? { vpa: vpa || undefined } : {}),
+          }
+        : person,
+    ),
+  })
+
+  for (const group of load().groups) {
+    if (group.shared) synced({ kind: 'changed', groupId: group.id })
+  }
+}
+
 export function addPerson(name: string, groupId?: string): Person {
   const current = load()
   const person: Person = { id: newId('p'), name: name.trim() }

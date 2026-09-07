@@ -10,6 +10,11 @@ export const contentType = 'image/png'
  * 32 pixels on a home screen is unreadable anyway. The two poles either side of
  * a centre line say what the product is with no type at all, and they are the
  * same two colours the whole interface is built from.
+ *
+ * Everything here is deliberately heavy. A browser tab renders this at 16
+ * pixels, where a 6px rule on a 512px canvas is a fifth of a pixel and simply
+ * disappears, leaving a smudge. Two equal blocks and a thick centre stem
+ * survive the reduction.
  */
 export default function Icon() {
   return new ImageResponse(
@@ -36,16 +41,16 @@ export default function Icon() {
       >
         {/* the axis */}
         <div
-          style={{ position: 'absolute', width: 340, height: 6, background: '#2b2833' }}
+          style={{ position: 'absolute', width: 340, height: 10, background: '#3a3644' }}
         />
         {/* you owe */}
         <div
           style={{
             position: 'absolute',
             left: 0,
-            width: 150,
-            height: 104,
-            borderRadius: 14,
+            width: 148,
+            height: 132,
+            borderRadius: 26,
             background: '#c77399',
           }}
         />
@@ -53,10 +58,10 @@ export default function Icon() {
         <div
           style={{
             position: 'absolute',
-            right: 24,
-            width: 96,
-            height: 104,
-            borderRadius: 14,
+            right: 0,
+            width: 148,
+            height: 132,
+            borderRadius: 26,
             background: '#3fa898',
           }}
         />
@@ -64,9 +69,10 @@ export default function Icon() {
         <div
           style={{
             position: 'absolute',
-            left: 168,
-            width: 6,
-            height: 168,
+            left: 164,
+            width: 12,
+            height: 208,
+            borderRadius: 6,
             background: '#eceae6',
           }}
         />

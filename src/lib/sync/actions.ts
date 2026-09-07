@@ -411,6 +411,9 @@ export async function joinGroup(
 
   const name = who.name.trim()
   if (!name) return { ok: false, message: 'Give a name so people know who you are.' }
+  if (!who.vpa?.trim()) {
+    return { ok: false, message: 'A UPI ID is how people pay you back. Add yours.' }
+  }
 
   const db = getDb()
   const me = await deviceId()

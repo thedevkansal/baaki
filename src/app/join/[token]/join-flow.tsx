@@ -150,9 +150,15 @@ export function JoinFlow({ token }: { token: string }) {
           />
         </Field>
 
+        {/**
+          * Not optional. It is the whole point: without it, everybody who owes
+          * this person has to leave the app, find them some other way and type
+          * an amount from memory, which is the thing being fixed. Asked for
+          * once, here, by the only person who can get it right.
+          */}
         <Field
           label="Your UPI ID"
-          hint="Optional, and only you can get it right. It is what people tap to pay you, prefilled with the exact amount."
+          hint="What people tap to pay you, with the amount already filled in."
           error={vpaLooksWrong ? 'That does not look like a UPI ID. Example: rahul@okhdfcbank' : undefined}
         >
           <input
@@ -172,7 +178,7 @@ export function JoinFlow({ token }: { token: string }) {
           variant="primary"
           size="lg"
           className="w-full"
-          disabled={busy || name.trim() === '' || vpaLooksWrong}
+          disabled={busy || name.trim() === '' || !isValidVpa(vpa.trim())}
           onClick={join}
         >
           {busy ? 'Joining…' : preview.alreadyIn ? 'Save and open' : 'Join the group'}
