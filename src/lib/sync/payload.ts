@@ -12,6 +12,18 @@ export interface GroupPayload {
   people: Person[]
   expenses: Expense[]
   settlements: Settlement[]
+  /** Things this device has been asked to do in this group. */
+  nudges?: Nudge[]
+}
+
+/** Something somebody has asked you to do. Resolves by being done. */
+export interface Nudge {
+  id: string
+  groupId: string
+  groupName: string
+  /** Who asked. */
+  fromName: string
+  kind: 'add-upi'
 }
 
 /** The slice of a device's state that belongs to one group. */

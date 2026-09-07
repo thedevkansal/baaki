@@ -9,10 +9,11 @@ import {
   expenseShares,
   expenses,
   groups,
+  nudges,
   participants,
   settlements,
 } from '@/db/schema'
-import type { GroupPayload, JoinLink } from './payload'
+import type { GroupPayload, JoinLink, Nudge } from './payload'
 
 const DEVICE_COOKIE = 'baaki-device'
 
@@ -528,7 +529,41 @@ async function readGroup(
     .from(settlements)
     .where(and(eq(settlements.groupId, serverGroupId), isNull(settlements.deletedAt)))
 
+  const asks: Nudge[] = []
+  if (device) {
+    const mySeat = seats.find((s) => s.deviceId === device)
+    if (mySeat) {
+      const rows = await db
+        .select({
+          id: nudges.id,
+          kind: nudges.kind,
+          fromParticipantId: nudges.fromParticipantId,
+        })
+        .from(nudges)
+        .where(eq(nudges.toParticipantId, mySeat.id))
+
+      for (const row of rows) {
+        /**
+         * A nudge resolves by being answered, not by being dismissed. Asking
+         * somebody to add a UPI ID stops being a thing to do the moment they
+         * have one, so it is filtered here rather than deleted on a write that
+         * might never happen.
+         */
+        if (row.kind === 'add-upi' && mySeat.vpa) continue
+        asks.push({
+          id: row.id,
+          groupId: group.localId,
+          groupName: group.name,
+          fromName:
+            seats.find((s) => s.id === row.fromParticipantId)?.displayName ?? 'Somebody',
+          kind: row.kind,
+        })
+      }
+    }
+  }
+
   return {
+    nudges: asks,
     group: {
       id: group.localId,
       name: group.name,
@@ -804,5 +839,49 @@ export async function makeAdmin(
     .returning({ id: participants.id })
 
   if (changed.length === 0) return { ok: false, message: 'They are not in this group.' }
+  return { ok: true }
+}
+
+/**
+ * Ask somebody in the group to add their UPI ID.
+ *
+ * The alternative was a sentence telling you to go and ask them yourself,
+ * through some other app, which is the friction this product exists to remove.
+ * Asking twice is the same ask: the unique index makes a second press a no-op
+ * rather than a second thing in their list.
+ */
+export async function sendNudge(
+  localGroupId: string,
+  toPersonLocalId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
+
+  const db = getDb()
+  const me = await deviceId()
+  const group = await serverGroup(db, localGroupId)
+  if (!group) return { ok: false, message: 'That group is not shared.' }
+
+  const from = await seatOf(db, group.id, me)
+  if (!from) return { ok: false, message: 'This device is not in that group.' }
+
+  const [to] = await db
+    .select({ id: participants.id })
+    .from(participants)
+    .where(
+      and(eq(participants.groupId, group.id), eq(participants.localId, toPersonLocalId)),
+    )
+    .limit(1)
+  if (!to) return { ok: false, message: 'They are not in this group.' }
+
+  await db
+    .insert(nudges)
+    .values({
+      groupId: group.id,
+      fromParticipantId: from.id,
+      toParticipantId: to.id,
+      kind: 'add-upi',
+    })
+    .onConflictDoNothing()
+
   return { ok: true }
 }

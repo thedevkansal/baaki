@@ -97,6 +97,15 @@ export interface Settlement {
   createdAt: string
 }
 
+/** Something somebody has asked you to do, carried in with the group. */
+export interface Nudge {
+  id: string
+  groupId: string
+  groupName: string
+  fromName: string
+  kind: 'add-upi'
+}
+
 export interface AppState {
   version: 1
   /** Which person is holding the phone. */
@@ -105,6 +114,8 @@ export interface AppState {
   groups: Group[]
   expenses: Expense[]
   settlements: Settlement[]
+  /** Outstanding asks, refreshed from the server on every pull. */
+  nudges?: Nudge[]
 }
 
 export const CATEGORIES = [

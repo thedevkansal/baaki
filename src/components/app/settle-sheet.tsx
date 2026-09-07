@@ -10,6 +10,7 @@ import { formatMoney } from '@/lib/format'
 import type { Money } from '@/lib/money'
 import { detectPlatform, isValidVpa, settleRoute } from '@/lib/upi/link'
 import { proposeSettlement, setPersonVpa } from '@/lib/store/store'
+import { sendNudge } from '@/lib/sync/actions'
 import type { Person } from '@/lib/store/types'
 
 export function SettleSheet({
@@ -113,18 +114,21 @@ export function SettleSheet({
                 Only they can add it. Typing it for them is how money reaches the wrong
                 person, and Baaki cannot see the payment to catch it.
               </p>
-              {/* One press, rather than "go and ask them somehow". */}
+              {/**
+                * The ask reaches them inside Baaki rather than asking you to
+                * go and chase them through some other app, which is the
+                * friction this whole product exists to remove.
+                */}
               <Button
                 size="sm"
                 className="mt-3"
-                onClick={() => {
-                  void navigator.clipboard.writeText(
-                    `Add your UPI ID in Baaki so I can pay you the ${formatMoney(amount)} for ${groupName}. It is under your name on the groups screen.`,
-                  )
-                  setAsked(true)
+                disabled={asked}
+                onClick={async () => {
+                  const result = await sendNudge(groupId, to.id)
+                  setAsked(result.ok)
                 }}
               >
-                {asked ? 'Message copied' : 'Copy a message asking them'}
+                {asked ? `${to.name} has been asked` : `Ask ${to.name} for it`}
               </Button>
             </div>
           )

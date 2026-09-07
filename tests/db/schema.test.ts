@@ -98,6 +98,7 @@ describe('the schema applies', () => {
       'expense_shares',
       'expenses',
       'groups',
+      'nudges',
       'participants',
       'payment_ids',
       'settlements',

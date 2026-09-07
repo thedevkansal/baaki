@@ -271,6 +271,42 @@ export const settlements = pgTable(
   ],
 )
 
+/**
+ * A small thing one person asks another to do.
+ *
+ * Not a chat and not an activity feed: a nudge names one missing thing and
+ * stops existing when that thing is done. "Add your UPI ID" answers itself the
+ * moment a UPI ID is added, so it is never dismissed by hand and never becomes
+ * a list of things nobody reads.
+ */
+export const nudges = pgTable(
+  'nudges',
+  {
+    id: id(),
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => groups.id, { onDelete: 'cascade' }),
+    fromParticipantId: uuid('from_participant_id')
+      .notNull()
+      .references(() => participants.id, { onDelete: 'cascade' }),
+    toParticipantId: uuid('to_participant_id')
+      .notNull()
+      .references(() => participants.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ['add-upi'] }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('nudges_to_idx').on(table.toParticipantId),
+    // Asking twice is the same ask, not two of them.
+    uniqueIndex('nudges_once_key').on(
+      table.groupId,
+      table.fromParticipantId,
+      table.toParticipantId,
+      table.kind,
+    ),
+  ],
+)
+
 export const groupsRelations = relations(groups, ({ many }) => ({
   participants: many(participants),
   expenses: many(expenses),

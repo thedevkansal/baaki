@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { NudgeBell } from '@/components/ui/nudge-bell'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { cn } from '@/lib/cn'
 
@@ -116,6 +117,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
+          <NudgeBell />
           <ThemeToggle />
           <Link
             href={inApp ? '/app' : '/app'}

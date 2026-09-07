@@ -2,7 +2,7 @@
 
 import type { SplitMode } from '../split'
 import type { Repeat } from '../recurring'
-import type { AppState, Expense, Group, Person, Settlement } from './types'
+import type { AppState, Expense, Group, Nudge, Person, Settlement } from './types'
 
 const STORAGE_KEY = 'baaki-state-v1'
 
@@ -514,6 +514,7 @@ export function applyPulledGroup(payload: {
   people: Person[]
   expenses: Expense[]
   settlements: Settlement[]
+  nudges?: Nudge[]
 }, meId?: string) {
   const current = load()
   const groupId = payload.group.id
@@ -557,6 +558,14 @@ export function applyPulledGroup(payload: {
     settlements: [
       ...current.settlements.filter((s) => s.groupId !== groupId),
       ...payload.settlements,
+    ],
+    /**
+     * Replaced for this group rather than appended, so an ask that has been
+     * answered disappears on the next pull without anybody dismissing it.
+     */
+    nudges: [
+      ...(current.nudges ?? []).filter((n) => n.groupId !== groupId),
+      ...(payload.nudges ?? []),
     ],
   })
 }
