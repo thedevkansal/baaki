@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { FALLBACK_RATES_TO_INR, SUPPORTED_CURRENCIES, convertMoney } from '@/lib/fx'
 import { fromMajor, money, sum, toMajorString, zero, type Money } from '@/lib/money'
+import { REPEAT_LABELS, type Repeat } from '@/lib/recurring'
 import { SPLIT_MODES, buildShares, evaluateAmount, type SplitMode } from '@/lib/split'
 import { addExpense, updateExpense } from '@/lib/store/store'
 import { CATEGORIES, type Expense, type Person } from '@/lib/store/types'
@@ -92,6 +93,7 @@ export function AddExpenseSheet({
   const [splitValues, setSplitValues] = useState<Record<string, string>>(
     () => existing?.splitValues ?? {},
   )
+  const [repeat, setRepeat] = useState<Repeat | 'none'>(existing?.repeat ?? 'none')
 
   const spent = evaluateAmount(amountText, spentCurrency)
   const isForeign = spentCurrency !== currency
@@ -155,6 +157,8 @@ export function AddExpenseSheet({
       payers,
       shares: split.shares.map((s) => ({ personId: s.ref, minor: s.amount.minor })),
       splitValues: mode === 'equal' ? undefined : splitValues,
+      repeat: repeat === 'none' ? undefined : repeat,
+      repeatOf: existing?.repeatOf,
       original:
         isForeign && spent
           ? { currency: spentCurrency, minor: spent.minor, rateToGroupCurrency: rate }
@@ -256,6 +260,25 @@ export function AddExpenseSheet({
             />
           </Field>
         )}
+
+        <Field
+          label="Repeats"
+          hint={
+            repeat === 'none'
+              ? 'Rent, a subscription, anything that comes back.'
+              : 'Baaki will offer to add each one when it falls due. It never adds a bill on its own.'
+          }
+        >
+          <SegmentedControl
+            value={repeat}
+            onChange={setRepeat}
+            options={[
+              { value: 'none', label: 'One off' },
+              { value: 'weekly', label: REPEAT_LABELS.weekly },
+              { value: 'monthly', label: REPEAT_LABELS.monthly },
+            ]}
+          />
+        </Field>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Category">

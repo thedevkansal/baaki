@@ -1,4 +1,5 @@
 import type { SplitMode } from '../split'
+import type { Repeat } from '../recurring'
 
 /**
  * Everything is stored with amounts as decimal strings of minor units, because
@@ -44,6 +45,10 @@ export interface Expense {
    * was entered rather than reverse engineering it from the amounts.
    */
   splitValues?: Record<string, string>
+  /** Set on the first bill of a series. Later ones point back at it instead. */
+  repeat?: Repeat
+  /** The id of the bill this one repeats. */
+  repeatOf?: string
   /**
    * What was actually spent, before conversion. Kept alongside the converted
    * amounts so an old expense still shows the number that was on the bill.

@@ -13,7 +13,9 @@ import { Sheet } from '@/components/ui/sheet'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { money, type Money } from '@/lib/money'
+import { describeDue, dueOccurrences } from '@/lib/recurring'
 import {
+  addDueOccurrences,
   addPerson,
   deleteExpense,
   deleteSettlement,
@@ -109,6 +111,27 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
   const visibleActivity = needle
     ? activity.filter((item) => searchText(item).includes(needle))
     : activity
+  /**
+   * Repeats that have come due but have not been entered.
+   *
+   * Nothing is created automatically. A bill appearing in your ledger without
+   * you putting it there is a bill you then have to check, so this offers and
+   * waits.
+   */
+  const today = new Date().toISOString().slice(0, 10)
+  const dueSeries = expenses
+    .filter((expense) => expense.repeat)
+    .map((template) => {
+      const entered = expenses
+        .filter((e) => e.id === template.id || e.repeatOf === template.id)
+        .map((e) => e.occurredOn)
+      return {
+        template,
+        due: dueOccurrences(template.occurredOn, template.repeat!, entered, today),
+      }
+    })
+    .filter((series) => series.due.length > 0)
+
   const myTransfers = ledger.transfers
     .map((t, index) => ({ t, index }))
     .filter(({ t }) => personIdOf(t.from) === state.meId)
@@ -232,6 +255,29 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           </div>
         )}
       </div>
+
+      {dueSeries.length > 0 && (
+        <ul className="mt-6 space-y-2">
+          {dueSeries.map(({ template, due }) => (
+            <li
+              key={template.id}
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-rule bg-paper-raised px-4 py-3"
+            >
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="font-medium">{template.description}</span> repeats.{' '}
+                {describeDue(due.length, template.repeat!)}.
+              </span>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => addDueOccurrences(template.id, due)}
+              >
+                Add {due.length === 1 ? 'it' : `all ${due.length}`}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {pending.length > 0 && (
         <ul className="mt-6 space-y-2">

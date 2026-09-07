@@ -1,6 +1,7 @@
 'use client'
 
 import type { SplitMode } from '../split'
+import type { Repeat } from '../recurring'
 import type { AppState, Expense, Group, Person, Settlement } from './types'
 
 const STORAGE_KEY = 'baaki-state-v1'
@@ -168,6 +169,8 @@ export interface ExpenseDraft {
   payers: { personId: string; minor: bigint }[]
   shares: { personId: string; minor: bigint }[]
   splitValues?: Record<string, string>
+  repeat?: Repeat
+  repeatOf?: string
   original?: { currency: string; minor: bigint; rateToGroupCurrency: string }
 }
 
@@ -183,6 +186,8 @@ export function addExpense(draft: ExpenseDraft): Expense {
     payers: draft.payers.map((p) => ({ personId: p.personId, minor: p.minor.toString() })),
     shares: draft.shares.map((s) => ({ personId: s.personId, minor: s.minor.toString() })),
     splitValues: draft.splitValues,
+    repeat: draft.repeat,
+    repeatOf: draft.repeatOf,
     original: draft.original && {
       currency: draft.original.currency,
       minor: draft.original.minor.toString(),
@@ -216,6 +221,8 @@ export function updateExpense(expenseId: string, draft: ExpenseDraft) {
               minor: s.minor.toString(),
             })),
             splitValues: draft.splitValues,
+            repeat: draft.repeat,
+            repeatOf: draft.repeatOf,
             original: draft.original && {
               currency: draft.original.currency,
               minor: draft.original.minor.toString(),
@@ -378,6 +385,30 @@ export function seedSampleGroup(): Group {
   })
 
   return group
+}
+
+/**
+ * Enter a repeat that has come due, copying the original bill onto a new date.
+ *
+ * Deliberately a copy rather than a reference: rent changes, and last March
+ * should still read as what was actually paid in March.
+ */
+export function addDueOccurrences(seriesId: string, dates: string[]): number {
+  const current = load()
+  const template = current.expenses.find((e) => e.id === seriesId)
+  if (!template || dates.length === 0) return 0
+
+  const created: Expense[] = dates.map((occurredOn) => ({
+    ...template,
+    id: newId('e'),
+    occurredOn,
+    repeat: undefined,
+    repeatOf: seriesId,
+    createdAt: new Date().toISOString(),
+  }))
+
+  commit({ ...current, expenses: [...created, ...current.expenses] })
+  return created.length
 }
 
 /** Wipe everything. Offered in settings, never automatic. */
