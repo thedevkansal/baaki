@@ -20,6 +20,7 @@ export function SettleSheet({
   from,
   to,
   amount,
+  shared,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -28,9 +29,20 @@ export function SettleSheet({
   from: Person
   to: Person
   amount: Money
+  /** In a shared group a UPI ID is its owner's to set, and nobody else's. */
+  shared: boolean
 }) {
-  // Mounted only while open, so this starts from whatever we know about them.
-  const [vpa, setVpa] = useState(to.vpa ?? '')
+  /**
+   * Their UPI ID, which in a shared group is theirs and is never typed here.
+   *
+   * A VPA entered by anybody but its owner is a payment to a stranger waiting
+   * to happen, and there is nobody to catch it: the app cannot see the payment,
+   * so a wrong one just silently goes somewhere else. On a group that is still
+   * only on this device there is no "them" to have set it, so it stays typable.
+   */
+  const theirs = to.vpa ?? ''
+  const [typed, setTyped] = useState(theirs)
+  const vpa = shared ? theirs : typed
   const [copied, setCopied] = useState(false)
   const platform = usePlatform()
 
@@ -43,7 +55,7 @@ export function SettleSheet({
   }, [vpa, amount, to.name, groupName, platform])
 
   const record = (method: 'upi' | 'cash' | 'other') => {
-    if (isValidVpa(vpa) && vpa !== to.vpa) setPersonVpa(to.id, vpa)
+    if (!shared && isValidVpa(vpa) && vpa !== to.vpa) setPersonVpa(to.id, vpa)
     proposeSettlement({
       groupId,
       fromId: from.id,
@@ -79,25 +91,51 @@ export function SettleSheet({
           </p>
         </div>
 
-        <Field
-          label={`${to.name}'s UPI ID`}
-          hint="Saved for next time. It never leaves this device."
-          error={
-            vpa.trim() !== '' && !isValidVpa(vpa)
-              ? 'That is not a valid UPI ID.'
-              : undefined
-          }
-        >
-          <input
-            className={cn(inputClass, 'font-mono')}
-            value={vpa}
-            onChange={(event) => setVpa(event.target.value)}
-            placeholder="priya@okhdfcbank"
-            inputMode="email"
-            autoCapitalize="none"
-            spellCheck={false}
-          />
-        </Field>
+        {shared ? (
+          isValidVpa(theirs) ? (
+            <div className="rounded-xl border border-rule bg-paper-raised px-4 py-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+                Paying
+              </p>
+              <p className="mt-1 font-mono text-sm">{theirs}</p>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                {to.name} set this themselves. Nobody else can.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-rule px-4 py-4">
+              <p className="text-sm leading-relaxed">
+                {to.name} has not added a UPI ID yet, so there is nothing to open a
+                payment app with.
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Ask them to add it in Baaki. Typing it for them is how money reaches
+                the wrong person, and Baaki cannot see the payment to catch it. You can
+                still pay them any other way and record it below.
+              </p>
+            </div>
+          )
+        ) : (
+          <Field
+            label={`${to.name}'s UPI ID`}
+            hint="This group is only on this device, so you are keeping their details. Once they join, it is theirs to set."
+            error={
+              typed.trim() !== '' && !isValidVpa(typed)
+                ? 'That is not a valid UPI ID.'
+                : undefined
+            }
+          >
+            <input
+              className={cn(inputClass, 'font-mono')}
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              placeholder="priya@okhdfcbank"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
+          </Field>
+        )}
 
         {amount.currency !== 'INR' && (
           <p className="text-sm text-muted">

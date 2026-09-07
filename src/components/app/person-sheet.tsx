@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { money, type Money } from '@/lib/money'
 import { removePersonFromGroup, renamePerson, setPersonVpa } from '@/lib/store/store'
+import { isValidVpa } from '@/lib/upi/link'
 import type { Expense, Group, Person } from '@/lib/store/types'
 
 /**
@@ -60,6 +61,10 @@ export function PersonSheet({
    * Until they turn up their name is a placeholder the owner can still fix.
    * Removing anybody is the owner's alone.
    */
+  const [vpa, setVpa] = useState(person.vpa ?? '')
+  const vpaLooksWrong = vpa.trim() !== '' && !isValidVpa(vpa.trim())
+  const dirty = name.trim() !== person.name || vpa.trim() !== (person.vpa ?? '')
+
   const unclaimed = group.shared ? !(group.claimed ?? []).includes(person.id) : true
   const isOwner = group.shared ? group.owner === true : true
   const canRename = isMe || (isOwner && unclaimed)
@@ -209,34 +214,51 @@ export function PersonSheet({
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
               {isMe ? 'You' : 'Name'}
             </p>
-            <div className="mt-3 flex gap-2">
-              <input
-                className={inputClass}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                aria-label={`Name for ${person.name}`}
-              />
-              <Button
-                size="sm"
-                disabled={!name.trim() || name.trim() === person.name}
-                onClick={() => renamePerson(person.id, name)}
-              >
-                Save
-              </Button>
-            </div>
+            <input
+              className={`${inputClass} mt-3`}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              aria-label={`Name for ${person.name}`}
+              placeholder="Name"
+            />
 
             {canEditVpa && (
               <input
-                className={`${inputClass} mt-3`}
-                value={person.vpa ?? ''}
+                className={`${inputClass} mt-2 font-mono`}
+                value={vpa}
                 inputMode="email"
                 autoCapitalize="none"
                 spellCheck={false}
                 placeholder="Your UPI ID"
                 aria-label="Your UPI ID"
-                onChange={(event) => setPersonVpa(person.id, event.target.value)}
+                onChange={(event) => setVpa(event.target.value)}
               />
             )}
+
+            {vpaLooksWrong && (
+              <p className="mt-2 text-xs text-neg">
+                That does not look like a UPI ID. Example: rahul@okhdfcbank
+              </p>
+            )}
+
+            {/**
+              * One Save for both. The UPI field used to write on every
+              * keystroke, which sent a push per character and meant the Save
+              * button beside it was only ever saving the name.
+              */}
+            <Button
+              size="sm"
+              className="mt-3"
+              disabled={!dirty || !name.trim() || vpaLooksWrong}
+              onClick={() => {
+                if (name.trim() !== person.name) renamePerson(person.id, name)
+                if (canEditVpa && vpa.trim() !== (person.vpa ?? '')) {
+                  setPersonVpa(person.id, vpa)
+                }
+              }}
+            >
+              {dirty ? 'Save' : 'Saved'}
+            </Button>
 
             {!isMe && canRename && (
               <p className="mt-3 text-xs leading-relaxed text-muted">

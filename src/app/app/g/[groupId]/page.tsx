@@ -731,6 +731,7 @@ export default function GroupPage({ params }: PageProps<'/app/g/[groupId]'>) {
           onOpenChange={(next) => !next && setSettling(null)}
           groupId={groupId}
           groupName={group.name}
+          shared={Boolean(group.shared)}
           from={me}
           to={settling.to}
           amount={settling.amount}

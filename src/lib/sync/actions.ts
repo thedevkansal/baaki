@@ -118,7 +118,14 @@ export async function shareGroup(
           target: groups.localId,
           // ownerDeviceId and inviteToken are never reassigned: whoever shared
           // it stays owner, and a link already sent out keeps working.
-          set: { name: group.name, currency: group.currency, simplify: group.simplify },
+          set: {
+            name: group.name,
+            currency: group.currency,
+            simplify: group.simplify,
+            // Groups made before this column existed have no owner. The first
+            // device to push after that adopts it; a real owner is never moved.
+            ownerDeviceId: sql`coalesce(${groups.ownerDeviceId}, excluded.owner_device_id)`,
+          },
         })
         .returning({ id: groups.id })
 
@@ -147,7 +154,9 @@ export async function shareGroup(
             vpa: person.vpa ?? null,
             // The sharing device takes its own seat on the spot; everybody
             // else arrives through the group's invite link.
-            ...(person.id === meLocalId ? { claimedAt: new Date(), deviceId: me } : {}),
+            ...(person.id === meLocalId
+              ? { claimedAt: new Date(), deviceId: me, role: 'admin' as const }
+              : {}),
           })
           .onConflictDoNothing()
       }
@@ -172,13 +181,13 @@ export async function shareGroup(
        * placeholder for a person who has not turned up, and correcting it to
        * "Priya" before she does is the point of listing people at all.
        */
-      const [owner] = await tx
-        .select({ deviceId: groups.ownerDeviceId })
-        .from(groups)
-        .where(eq(groups.id, serverGroupId))
+      const [seat] = await tx
+        .select({ role: participants.role })
+        .from(participants)
+        .where(and(eq(participants.groupId, serverGroupId), eq(participants.deviceId, me)))
         .limit(1)
 
-      if (owner?.deviceId === me) {
+      if (seat?.role === 'admin') {
         for (const person of payload.people) {
           if (person.id === meLocalId) continue
           await tx
@@ -524,8 +533,11 @@ async function readGroup(
       simplify: group.simplify,
       memberIds: seats.map((s) => s.localId),
       createdAt: group.createdAt.toISOString(),
-      owner: device !== undefined && group.ownerDeviceId === device,
+      owner:
+        device !== undefined &&
+        seats.some((s) => s.deviceId === device && s.role === 'admin'),
       claimed: seats.filter((s) => s.claimedAt).map((s) => s.localId),
+      admins: seats.filter((s) => s.role === 'admin').map((s) => s.localId),
     },
     people: seats.map((s) => ({
       id: s.localId,
@@ -719,18 +731,12 @@ export async function removeParticipant(
   const db = getDb()
   const me = await deviceId()
 
-  const [group] = await db
-    .select({ id: groups.id, ownerDeviceId: groups.ownerDeviceId })
-    .from(groups)
-    .where(eq(groups.localId, localGroupId))
-    .limit(1)
+  const group = await serverGroup(db, localGroupId)
   if (!group) return { ok: false, message: 'That group is not shared.' }
-  if (group.ownerDeviceId !== me) {
-    return { ok: false, message: 'Only whoever set the group up can remove someone.' }
-  }
 
-  const seat = await seatOf(db, group.id, me)
-  if (seat?.localId === personLocalId) {
+  const seat = await adminSeat(db, group.id, me)
+  if (!seat) return { ok: false, message: 'Only an admin of this group can remove someone.' }
+  if (seat.localId === personLocalId) {
     return { ok: false, message: 'You cannot remove yourself from your own group.' }
   }
 
@@ -749,4 +755,51 @@ export async function removeParticipant(
   } catch {
     return { ok: false, message: 'They are on a bill in this group, so they have to stay.' }
   }
+}
+
+/** This device's seat in a group, but only if it is an admin one. */
+async function adminSeat(db: Db, serverGroupId: string, device: string) {
+  const [seat] = await db
+    .select({ id: participants.id, localId: participants.localId })
+    .from(participants)
+    .where(
+      and(
+        eq(participants.groupId, serverGroupId),
+        eq(participants.deviceId, device),
+        eq(participants.role, 'admin'),
+      ),
+    )
+    .limit(1)
+  return seat ?? null
+}
+
+/**
+ * Hand somebody else the keys.
+ *
+ * An admin can make another member an admin, and cannot demote anybody:
+ * a group whose only admin lost their phone should be rescuable, and a group
+ * where two admins can strip each other should not exist.
+ */
+export async function makeAdmin(
+  localGroupId: string,
+  personLocalId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  if (!isDatabaseConfigured()) return { ok: false, message: 'No database is configured.' }
+
+  const db = getDb()
+  const me = await deviceId()
+  const group = await serverGroup(db, localGroupId)
+  if (!group) return { ok: false, message: 'That group is not shared.' }
+
+  const seat = await adminSeat(db, group.id, me)
+  if (!seat) return { ok: false, message: 'Only an admin can make somebody else one.' }
+
+  const changed = await db
+    .update(participants)
+    .set({ role: 'admin' })
+    .where(and(eq(participants.groupId, group.id), eq(participants.localId, personLocalId)))
+    .returning({ id: participants.id })
+
+  if (changed.length === 0) return { ok: false, message: 'They are not in this group.' }
+  return { ok: true }
 }

@@ -40,8 +40,10 @@ export interface Group {
    * for groups made here.
    */
   meId?: string
-  /** True when this device set the group up. Only the owner may remove people. */
+  /** True when this device's seat is an admin one. */
   owner?: boolean
+  /** Ids of everyone who administers the group. */
+  admins?: string[]
   /** Ids of people who have actually turned up, so placeholders stay editable. */
   claimed?: string[]
 }

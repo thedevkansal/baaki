@@ -129,6 +129,17 @@ export const participants = pgTable(
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     displayName: text('display_name').notNull(),
     vpa: text('vpa'),
+    /**
+     * What this person may do to the group rather than to the ledger.
+     *
+     * Whoever sets a group up is an admin, and admins can remove people, fix a
+     * name nobody has claimed yet, and make somebody else an admin. It lives on
+     * the seat and not on the device so that losing a phone loses a session,
+     * not the only person who can administer the group.
+     */
+    role: text('role', { enum: ['admin', 'member'] })
+      .notNull()
+      .default('member'),
     localId: localId(),
     /**
      * The secret in this person's join link. One token per seat rather than one

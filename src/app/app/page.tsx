@@ -9,6 +9,7 @@ import { Avatar, Field, inputClass } from '@/components/ui/field'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { formatMoney } from '@/lib/format'
+import { isValidVpa } from '@/lib/upi/link'
 import { add, zero } from '@/lib/money'
 import { SUPPORTED_CURRENCIES } from '@/lib/fx'
 import {
@@ -29,7 +30,12 @@ export default function GroupsPage() {
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('INR')
   const [others, setOthers] = useState('')
-  const [myName, setMyNameField] = useState('')
+  /**
+   * null means untouched, so the field shows what is stored without needing an
+   * effect to copy it in and without going stale when a pull changes it.
+   */
+  const [nameDraft, setNameDraft] = useState<string | null>(null)
+  const [vpaDraft, setVpaDraft] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
 
   const me = state.people.find((p) => p.id === state.meId)
@@ -37,6 +43,12 @@ export default function GroupsPage() {
   // chose. Anything that puts a name in front of other people asks for a real
   // one first.
   const unnamed = !me?.name || me.name === 'You'
+  const storedName = unnamed ? '' : (me?.name ?? '')
+  const storedVpa = me?.vpa ?? ''
+  const myName = nameDraft ?? storedName
+  const myVpa = vpaDraft ?? storedVpa
+  const myVpaLooksWrong = myVpa.trim() !== '' && !isValidVpa(myVpa.trim())
+  const profileDirty = myName.trim() !== storedName || myVpa.trim() !== storedVpa
   const overall = summaries.reduce((acc, s) => add(acc, s.yourNet), zero('INR'))
   const sameCurrency = summaries.every((s) => s.group.currency === 'INR')
 
@@ -155,24 +167,40 @@ export default function GroupsPage() {
           <Avatar name={me?.name ?? 'You'} />
           <input
             className={inputClass}
-            value={unnamed ? '' : (me?.name ?? '')}
-            onChange={(event) => setMyName(event.target.value)}
+            value={myName}
+            onChange={(event) => setNameDraft(event.target.value)}
             aria-label="Your name"
             placeholder="Your name"
           />
         </div>
-        <div className="mt-3">
-          <input
-            className={inputClass}
-            value={me?.vpa ?? ''}
-            inputMode="email"
-            autoCapitalize="none"
-            spellCheck={false}
-            onChange={(event) => me && setPersonVpa(me.id, event.target.value)}
-            aria-label="Your UPI ID"
-            placeholder="Your UPI ID, so people can pay you"
-          />
-        </div>
+        <input
+          className={`${inputClass} mt-2 font-mono`}
+          value={myVpa}
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          onChange={(event) => setVpaDraft(event.target.value)}
+          aria-label="Your UPI ID"
+          placeholder="Your UPI ID, so people can pay you"
+        />
+        {myVpaLooksWrong && (
+          <p className="mt-2 text-xs text-neg">
+            That does not look like a UPI ID. Example: dev@okhdfcbank
+          </p>
+        )}
+        <Button
+          size="sm"
+          className="mt-3"
+          disabled={!profileDirty || !myName.trim() || myVpaLooksWrong}
+          onClick={() => {
+            if (myName.trim() !== me?.name) setMyName(myName)
+            if (me && myVpa.trim() !== storedVpa) setPersonVpa(me.id, myVpa)
+            setNameDraft(null)
+            setVpaDraft(null)
+          }}
+        >
+          {profileDirty ? 'Save' : 'Saved'}
+        </Button>
         <p className="mt-3 text-xs leading-relaxed text-muted">
           A group stays on this device until you share it. Once you do, everyone in it
           keeps their own copy and balances stay in step.
@@ -208,7 +236,7 @@ export default function GroupsPage() {
               <input
                 className={inputClass}
                 value={myName}
-                onChange={(event) => setMyNameField(event.target.value)}
+                onChange={(event) => setNameDraft(event.target.value)}
                 placeholder="Dev"
                 autoFocus
               />
