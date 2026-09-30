@@ -28,7 +28,14 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  await supabase.auth.getUser()
+  /**
+   * A paused or unreachable Supabase must not take every page down with it.
+   * Give the refresh a few seconds, then let the request through regardless.
+   */
+  await Promise.race([
+    supabase.auth.getUser().catch(() => null),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ])
   return response
 }
 
