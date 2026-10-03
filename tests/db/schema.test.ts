@@ -105,6 +105,15 @@ describe('the schema applies', () => {
       'users',
     ])
   })
+
+  it('keeps row level security on for every table', async () => {
+    const result = await db.query<{ relname: string }>(
+      `select c.relname from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`,
+    )
+    expect(result.rows.map((r) => r.relname)).toEqual([])
+  })
 })
 
 describe('money conservation', () => {
